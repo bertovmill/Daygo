@@ -1192,6 +1192,14 @@ export default function TodayPage() {
     },
   })
 
+  const toggleHabitMutation = useMutation({
+    mutationFn: ({ habitId, completed }: { habitId: string; completed: boolean }) =>
+      habitsService.toggleHabitCompletion(user!.id, habitId, dateStr, completed),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['habits'] })
+    },
+  })
+
   const reorderMantrasMutation = useMutation({
     mutationFn: (orderedIds: string[]) => mantrasService.reorderMantras(orderedIds),
     onSuccess: () => {
@@ -2785,6 +2793,7 @@ export default function TodayPage() {
                           key={habit.id}
                           habit={habit}
                           onEdit={(h) => setSelectedHabit(h)}
+                          onToggle={(habitId, completed) => toggleHabitMutation.mutate({ habitId, completed })}
                         />
                       ))}
                     </div>
