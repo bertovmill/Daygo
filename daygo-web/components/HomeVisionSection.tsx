@@ -111,10 +111,12 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
     }
   }, [mitChecked])
 
-  const { data: homeVision, isLoading } = useQuery({
+  const { data: homeVision } = useQuery({
     queryKey: ['homeVision', userId],
     queryFn: () => homeVisionsService.getHomeVision(userId),
     enabled: !!userId,
+    retry: false,
+    staleTime: 1000 * 60 * 5,
   })
 
   const upsertMutation = useMutation({
@@ -224,8 +226,6 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
     }
     setEditData({ ...editData, pillars: newPillars })
   }, [editData])
-
-  if (isLoading) return null
 
   // No home vision and not editing - show create button
   if (!homeVision && !isEditing) {
