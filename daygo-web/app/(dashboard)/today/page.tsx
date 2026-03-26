@@ -2192,12 +2192,6 @@ export default function TodayPage() {
         <HomeVisionSection userId={user.id} selectedDate={selectedDate} />
       )}
 
-      <DailyPlanningScratchpad
-        selectedDate={selectedDate}
-        scheduleEvents={scheduleEvents}
-        googleCalendarEvents={googleCalendarEvents as Array<{ id: string; title: string; description?: string | null; start_time: string; end_time: string; is_all_day?: boolean }>}
-      />
-
       {/* Unique Edge — Venn diagram of top 1% strengths */}
       <UniqueEdgeVenn />
 
@@ -2331,6 +2325,12 @@ export default function TodayPage() {
           <p className="text-sm text-slate-300 dark:text-slate-600 italic">Connect your calendar to see today&apos;s schedule.</p>
         ) : null}
       </section>
+
+      <DailyPlanningScratchpad
+        selectedDate={selectedDate}
+        scheduleEvents={scheduleEvents}
+        googleCalendarEvents={googleCalendarEvents as Array<{ id: string; title: string; description?: string | null; start_time: string; end_time: string; is_all_day?: boolean }>}
+      />
 
       {/* Daily Reflection - bertmill19 */}
       {user?.email === 'bertmill19@gmail.com' && (

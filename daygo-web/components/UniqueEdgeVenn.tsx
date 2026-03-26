@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 
 export function UniqueEdgeVenn() {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(true)
   const [animStep, setAnimStep] = useState(0)
 
   useEffect(() => {
