@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { googleCalendarService } from '@/lib/services/googleCalendar'
 
 export async function GET(request: NextRequest) {
+  const baseUrl = `${request.nextUrl.protocol}//${request.nextUrl.host}`
+
   try {
     const searchParams = request.nextUrl.searchParams
     const code = searchParams.get('code')
@@ -10,11 +12,11 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Google OAuth error:', error)
-      return NextResponse.redirect(new URL('/today?gcal_error=denied', request.url))
+      return NextResponse.redirect(`${baseUrl}/today?gcal_error=denied`)
     }
 
     if (!code || !state) {
-      return NextResponse.redirect(new URL('/today?gcal_error=missing_params', request.url))
+      return NextResponse.redirect(`${baseUrl}/today?gcal_error=missing_params`)
     }
 
     // Exchange code for tokens
@@ -29,9 +31,17 @@ export async function GET(request: NextRequest) {
     )
 
     // Redirect back to today page with success message
-    return NextResponse.redirect(new URL('/today?gcal_connected=true', request.url))
+    return NextResponse.redirect(`${baseUrl}/today?gcal_connected=true`)
   } catch (error) {
     console.error('Error in Google Calendar callback:', error)
-    return NextResponse.redirect(new URL('/today?gcal_error=exchange_failed', request.url))
+    // Return a visible error page so the user can see what went wrong
+    return new NextResponse(
+      `<html><body style="font-family:sans-serif;padding:40px;max-width:500px;margin:0 auto">
+        <h2>Google Calendar connection failed</h2>
+        <p style="color:#666">${error instanceof Error ? error.message : 'Unknown error'}</p>
+        <a href="${baseUrl}/today" style="color:#64748b">Back to DayGo</a>
+      </body></html>`,
+      { status: 500, headers: { 'Content-Type': 'text/html' } }
+    )
   }
 }

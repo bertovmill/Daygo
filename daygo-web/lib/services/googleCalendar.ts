@@ -128,17 +128,28 @@ export const googleCalendarService = {
       refresh_token: tokens.refresh_token,
     })
 
-    const { credentials } = await oauth2Client.refreshAccessToken()
+    try {
+      const { credentials } = await oauth2Client.refreshAccessToken()
 
-    // Save new tokens
-    await this.saveTokens(
-      userId,
-      credentials.access_token!,
-      tokens.refresh_token,
-      credentials.expiry_date!
-    )
+      // Save new tokens
+      await this.saveTokens(
+        userId,
+        credentials.access_token!,
+        tokens.refresh_token,
+        credentials.expiry_date!
+      )
 
-    return credentials.access_token!
+      return credentials.access_token!
+    } catch (err: unknown) {
+      // invalid_grant means the refresh token is revoked/expired
+      // Clean up the stale token so the user can re-connect
+      const message = err instanceof Error ? err.message : String(err)
+      if (message.includes('invalid_grant')) {
+        await this.disconnect(userId)
+        throw new Error('GOOGLE_REAUTH_REQUIRED')
+      }
+      throw err
+    }
   },
 
   // Get authenticated calendar client
@@ -203,6 +214,27 @@ export const googleCalendarService = {
     })
 
     return response.data as GoogleCalendarEvent
+  },
+
+  // List all calendars for user
+  async listCalendars(userId: string): Promise<Array<{ id: string; summary: string; primary?: boolean }>> {
+    const calendar = await this.getCalendarClient(userId)
+    const response = await calendar.calendarList.list()
+    return (response.data.items || []).map(cal => ({
+      id: cal.id!,
+      summary: cal.summary || cal.id!,
+      primary: cal.primary || false,
+    }))
+  },
+
+  // Set active calendar for a user
+  async setActiveCalendar(userId: string, calendarId: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('google_calendar_tokens')
+      .update({ calendar_id: calendarId, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+
+    if (error) throw error
   },
 
   // Delete event from Google Calendar

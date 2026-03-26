@@ -50,6 +50,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ events: transformedEvents })
   } catch (error) {
     console.error('Error fetching Google Calendar events:', error)
+    const message = error instanceof Error ? error.message : ''
+    if (message === 'GOOGLE_REAUTH_REQUIRED') {
+      return NextResponse.json({ error: 'reauth_required' }, { status: 401 })
+    }
     return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 })
   }
 }

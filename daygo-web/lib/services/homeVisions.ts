@@ -6,12 +6,21 @@ export interface PillarItem {
   target?: number // daily target for metric items
 }
 
+export type HomeVisionMetricKind = 'currency_millions' | 'count' | 'time_seconds'
+
 export interface HomeVisionPillar {
   label: string
   goal: string
   tagline: string
   color: 'emerald' | 'sky' | 'purple' | 'amber' | 'rose'
-  items: PillarItem[]
+  items: (string | PillarItem)[]
+  current_value?: number | null
+  target_value?: number | null
+  metric_kind?: HomeVisionMetricKind | null
+  current_label?: string | null
+  target_label?: string | null
+  baseline_date?: string | null
+  target_date?: string | null
 }
 
 // Helper to normalize legacy string items to PillarItem objects

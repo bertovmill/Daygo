@@ -91,7 +91,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen flex overflow-x-hidden">
       {/* Desktop Sidebar */}
-      <aside className={`hidden md:flex fixed top-0 left-0 h-screen flex-col bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-700/50 z-40 transition-all duration-300 ${sidebarCollapsed ? 'w-[4.5rem]' : 'w-56'}`}>
+      <aside className={`hidden md:flex fixed top-0 left-0 h-screen flex-col bg-card/90 dark:bg-slate-900/90 backdrop-blur-sm border-r border-slate-200/40 dark:border-slate-700/40 z-40 transition-all duration-300 ${sidebarCollapsed ? 'w-[4.5rem]' : 'w-56'}`}>
         {/* Logo */}
         <div className={`flex items-center gap-2.5 py-5 ${sidebarCollapsed ? 'justify-center px-2' : 'px-5'}`}>
           <Image

@@ -84,13 +84,13 @@ import { profilesService } from '@/lib/services/profiles'
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line } from 'recharts'
 import { expensesService } from '@/lib/services/expenses'
 import { pushupsService } from '@/lib/services/pushups'
-import { giftIdeasService } from '@/lib/services/giftIdeas'
 import { dailyReflectionsService } from '@/lib/services/dailyReflections'
 import { SortableHabitCard } from '@/components/SortableHabitCard'
 import { SortableMantraCard } from '@/components/SortableMantraCard'
 import { MantraCard } from '@/components/MantraCard'
 import { SortableVisionCard } from '@/components/SortableVisionCard'
 import { HomeVisionSection } from '@/components/HomeVisionSection'
+import { UniqueEdgeVenn } from '@/components/UniqueEdgeVenn'
 import { SortableIdentityCard } from '@/components/SortableIdentityCard'
 import { SortableTodoCard } from '@/components/SortableTodoCard'
 import { SortableJournalCard, JOURNAL_ICON_OPTIONS, JOURNAL_COLOR_OPTIONS } from '@/components/SortableJournalCard'
@@ -192,6 +192,7 @@ export default function TodayPage() {
   const [showMissNoteModal, setShowMissNoteModal] = useState(false)
   const [missNoteText, setMissNoteText] = useState('')
   const [gcalNotification, setGcalNotification] = useState<string | null>(null)
+  const [showCalendarPicker, setShowCalendarPicker] = useState(false)
   const [showPromptModal, setShowPromptModal] = useState(false)
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null)
   const [slideInDirection, setSlideInDirection] = useState<'left' | 'right' | null>(null)
@@ -272,8 +273,6 @@ export default function TodayPage() {
   const [reflectionAnswer, setReflectionAnswer] = useState<boolean | null>(null)
   const [reflectionReason, setReflectionReason] = useState('')
   const [reflectionSaved, setReflectionSaved] = useState(false)
-  const [newGiftIdea, setNewGiftIdea] = useState('')
-  const [showGiftIdeas, setShowGiftIdeas] = useState(false)
   // Section collapse/expand state
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
     if (typeof window !== 'undefined') {
@@ -692,13 +691,43 @@ export default function TodayPage() {
       const response = await fetch(`/api/google-calendar/events?date=${dateStr}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
-      if (!response.ok) return []
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        if (body.error === 'reauth_required') {
+          // Token expired/revoked — clear connection status so user can reconnect
+          queryClient.setQueryData(['gcal-status'], { connected: false })
+        }
+        return []
+      }
       const { events } = await response.json()
       return events || []
     },
     enabled: !!user && isGcalConnected,
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    retry: false,
   })
+
+  // Fetch list of calendars and active calendar ID
+  const { data: gcalCalendarsData } = useQuery({
+    queryKey: ['gcal-calendars'],
+    queryFn: async () => {
+      const { data: { session } } = await (await import('@/lib/supabase')).supabase.auth.getSession()
+      if (!session?.access_token) return { calendars: [], activeCalendarId: 'primary' }
+      const response = await fetch('/api/google-calendar/calendars', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!response.ok) return { calendars: [], activeCalendarId: 'primary' }
+      return response.json()
+    },
+    enabled: !!user && isGcalConnected,
+    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+  })
+
+  const gcalCalendars: Array<{ id: string; summary: string; primary?: boolean }> = gcalCalendarsData?.calendars || []
+  const activeCalendarId: string = gcalCalendarsData?.activeCalendarId || 'primary'
+  const activeCalendarName = gcalCalendars.find((c: { id: string; summary: string }) => c.id === activeCalendarId)?.summary
+    || gcalCalendars.find((c: { primary?: boolean }) => c.primary)?.summary
+    || null
 
   const { data: todaysPepTalk } = useQuery({
     queryKey: ['pep-talk', user?.id, dateStr],
@@ -746,13 +775,6 @@ export default function TodayPage() {
       setPushupCount(String(todayPushup.count))
     }
   }, [todayPushup])
-
-  // Gift Ideas
-  const { data: giftIdeas = [] } = useQuery({
-    queryKey: ['gift-ideas', user?.id],
-    queryFn: () => giftIdeasService.getGiftIdeas(user!.id),
-    enabled: !!user,
-  })
 
   const createExpenseMutation = useMutation({
     mutationFn: ({ amount, category, description }: { amount: number; category: ExpenseCategory; description: string | null }) =>
@@ -1419,6 +1441,29 @@ export default function TodayPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gcal-status'] })
+      queryClient.invalidateQueries({ queryKey: ['gcal-calendars'] })
+      setShowCalendarPicker(false)
+    },
+  })
+
+  const switchCalendarMutation = useMutation({
+    mutationFn: async (calendarId: string) => {
+      const { data: { session } } = await (await import('@/lib/supabase')).supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+      const response = await fetch('/api/google-calendar/calendars', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ calendarId }),
+      })
+      if (!response.ok) throw new Error('Failed to switch calendar')
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gcal-calendars'] })
+      queryClient.invalidateQueries({ queryKey: ['gcal-events'] })
+      setShowCalendarPicker(false)
     },
   })
 
@@ -2062,7 +2107,7 @@ export default function TodayPage() {
   const isLoading = habitsLoading || mantrasLoading || promptsLoading || todosLoading || visionsLoading || identitiesLoading
 
   return (
-    <div {...swipeHandlers} className="max-w-lg mx-auto px-5 py-8 pb-32 min-h-screen bg-gradient-to-b from-bevel-bg to-white dark:from-slate-900 dark:to-slate-950 overflow-x-hidden">
+    <div {...swipeHandlers} className="max-w-lg mx-auto px-5 py-8 pb-32 min-h-screen overflow-x-hidden">
       {/* Hidden audio elements for iOS PWA compatibility */}
       <audio ref={visionAudioRef} playsInline preload="none" style={{ display: 'none' }} />
       <audio ref={mantraAudioRef} playsInline preload="none" style={{ display: 'none' }} />
@@ -2078,7 +2123,7 @@ export default function TodayPage() {
       )}
 
       {/* Tagline */}
-      <p className="text-center text-sm font-semibold tracking-widest uppercase text-brand-500 dark:text-brand-400 mt-10 mb-6">
+      <p className="text-center text-xs font-medium tracking-[0.2em] uppercase text-slate-400 dark:text-slate-500 mt-10 mb-6">
         Connect your highest ambitions to your daily habits.
       </p>
 
@@ -2091,15 +2136,15 @@ export default function TodayPage() {
           <ChevronLeft className="w-5 h-5 text-bevel-text-secondary dark:text-slate-400" />
         </button>
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-bevel-text dark:text-white tracking-tight">
+          <h1 className="text-3xl font-heading font-medium text-bevel-text dark:text-white tracking-tight">
             {formatDisplayDate(selectedDate)}
           </h1>
-          <p className="text-sm text-bevel-text-secondary dark:text-slate-400 mt-0.5">
+          <p className="text-sm text-slate-400 dark:text-slate-500 mt-0.5">
             {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
           <Link
             href="/year"
-            className="inline-flex items-center gap-1.5 mt-2 text-xs font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 transition-colors"
+            className="inline-flex items-center gap-1.5 mt-2 text-xs font-medium text-slate-400 hover:text-slate-600 dark:text-slate-500 transition-colors"
           >
             <CalendarDays className="w-3.5 h-3.5" />
             Year View
@@ -2116,20 +2161,26 @@ export default function TodayPage() {
       {/* Quick Jump Chips */}
       <div className="flex items-center gap-2 mb-6 -mt-2 flex-wrap">
         <button
+          onClick={() => document.getElementById('section-calendar')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          className="px-3 py-1.5 text-xs font-medium rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-95"
+        >
+          Calendar
+        </button>
+        <button
           onClick={() => document.getElementById('section-meal-plan')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          className="px-3 py-1.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors active:scale-95"
+          className="px-3 py-1.5 text-xs font-medium rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-95"
         >
           Meal Plan
         </button>
         <button
           onClick={() => document.getElementById('section-journal')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          className="px-3 py-1.5 text-xs font-medium rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors active:scale-95"
+          className="px-3 py-1.5 text-xs font-medium rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-95"
         >
           Journal
         </button>
         <button
           onClick={() => document.getElementById('section-expenses')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          className="px-3 py-1.5 text-xs font-medium rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors active:scale-95"
+          className="px-3 py-1.5 text-xs font-medium rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors active:scale-95"
         >
           Expenses
         </button>
@@ -2140,17 +2191,134 @@ export default function TodayPage() {
         <HomeVisionSection userId={user.id} selectedDate={selectedDate} />
       )}
 
+      {/* Unique Edge — Venn diagram of top 1% strengths */}
+      <UniqueEdgeVenn />
+
+      {/* Today's Calendar — Google Calendar events */}
+      <section id="section-calendar" className="mb-10 -mt-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-slate-400" />
+            <h2 className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400">
+              Today&apos;s Calendar
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            {!isGcalConnected && (
+              <button
+                onClick={() => connectGcalMutation.mutate()}
+                disabled={connectGcalMutation.isPending}
+                className="text-xs font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+              >
+                {connectGcalMutation.isPending ? 'Connecting...' : 'Connect Google Calendar'}
+              </button>
+            )}
+            {isGcalConnected && (
+              <>
+                <button
+                  onClick={() => {
+                    queryClient.invalidateQueries({ queryKey: ['gcal-events', user?.id, dateStr] })
+                  }}
+                  className="p-1 text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400 transition-colors"
+                  title="Refresh events"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setShowCalendarPicker(!showCalendarPicker)}
+                  className="text-[10px] font-medium text-slate-300 hover:text-slate-500 dark:text-slate-600 dark:hover:text-slate-400 uppercase tracking-wider transition-colors"
+                >
+                  {activeCalendarName || 'Connected'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Calendar picker dropdown */}
+        {isGcalConnected && showCalendarPicker && (
+          <div className="mb-4 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-card dark:bg-slate-900 space-y-1">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 mb-2">Select calendar</p>
+            {gcalCalendars.map((cal: { id: string; summary: string; primary?: boolean }) => (
+              <button
+                key={cal.id}
+                onClick={() => {
+                  switchCalendarMutation.mutate(cal.id)
+                }}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                  cal.id === activeCalendarId
+                    ? 'bg-slate-100 dark:bg-slate-800 text-bevel-text dark:text-slate-200 font-medium'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                }`}
+              >
+                {cal.summary}
+                {cal.primary && <span className="ml-2 text-[10px] text-slate-300 dark:text-slate-600">(primary)</span>}
+              </button>
+            ))}
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 mt-2">
+              <button
+                onClick={() => disconnectGcalMutation.mutate()}
+                className="text-xs text-slate-400 hover:text-red-400 transition-colors"
+              >
+                Disconnect
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isGcalConnected && googleCalendarEvents.length > 0 ? (
+          <div className="space-y-1">
+            {(googleCalendarEvents as Array<{ id: string; title: string; description?: string | null; start_time: string; end_time: string; is_all_day?: boolean }>)
+              .filter((event) => !event.is_all_day)
+              .sort((a, b) => a.start_time.localeCompare(b.start_time))
+              .map((event) => {
+                const formatTime = (t: string) => {
+                  const [h, m] = t.split(':')
+                  const hour = parseInt(h)
+                  const ampm = hour >= 12 ? 'pm' : 'am'
+                  const display = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+                  return `${display}:${m}${ampm}`
+                }
+                return (
+                  <div
+                    key={event.id}
+                    className="flex items-start gap-3 py-2.5 border-b border-slate-100 dark:border-slate-800 last:border-0"
+                  >
+                    <div className="w-14 text-right flex-shrink-0">
+                      <span className="text-xs font-medium text-slate-400 dark:text-slate-500 tabular-nums">
+                        {formatTime(event.start_time)}
+                      </span>
+                    </div>
+                    <div className="w-px h-full min-h-[20px] bg-slate-200 dark:bg-slate-700 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-bevel-text dark:text-slate-200 truncate">
+                        {event.title}
+                      </p>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                        {formatTime(event.start_time)} – {formatTime(event.end_time)}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
+        ) : isGcalConnected && googleCalendarEvents.length === 0 ? (
+          <p className="text-sm text-slate-300 dark:text-slate-600 italic">No events today — open canvas for deep work.</p>
+        ) : !isGcalConnected ? (
+          <p className="text-sm text-slate-300 dark:text-slate-600 italic">Connect your calendar to see today&apos;s schedule.</p>
+        ) : null}
+      </section>
 
       {/* Daily Reflection - bertmill19 */}
       {user?.email === 'bertmill19@gmail.com' && (
         <div className="mb-10 -mt-6">
-          <div className="rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-rose-500 p-[2px]">
-            <div className="rounded-2xl bg-white dark:bg-slate-900 p-5">
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-700">
+            <div className="rounded-2xl bg-card dark:bg-slate-900 p-5">
               <div className="flex items-center gap-2 mb-1">
-                <Flame className="w-5 h-5 text-orange-500" />
-                <h2 className="text-lg font-extrabold text-bevel-text dark:text-white tracking-tight uppercase">Daily Reflection</h2>
+                <Flame className="w-5 h-5 text-slate-400" />
+                <h2 className="text-lg font-heading font-medium text-bevel-text dark:text-white tracking-tight uppercase">Daily Reflection</h2>
               </div>
-              <p className="text-base font-bold text-bevel-text dark:text-white mb-4">Did I live out the best possible day?</p>
+              <p className="text-base font-medium text-bevel-text dark:text-white mb-4">Did I live out the best possible day?</p>
 
               <div className="flex gap-3 mb-4">
                 <button
@@ -2193,7 +2361,7 @@ export default function TodayPage() {
                     className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all ${
                       reflectionSaved
                         ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg'
+                        : 'bg-slate-600 text-white hover:bg-slate-700'
                     }`}
                   >
                     {saveReflectionMutation.isPending ? 'Saving...' : reflectionSaved ? 'Saved' : 'Save Reflection'}
@@ -2201,88 +2369,6 @@ export default function TodayPage() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Gift Ideas for Katy - bertmill19 */}
-      {user?.email === 'bertmill19@gmail.com' && (
-        <div className="mb-8">
-          <div className="rounded-2xl bg-white dark:bg-slate-800/50 shadow-card border border-pink-100 dark:border-pink-500/10 overflow-hidden">
-            <button
-              onClick={() => setShowGiftIdeas(!showGiftIdeas)}
-              className="w-full flex items-center justify-between p-4 hover:bg-pink-50/30 dark:hover:bg-pink-500/5 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <Heart className="w-5 h-5 text-pink-500" />
-                <h2 className="font-bold text-bevel-text dark:text-white">Gift Ideas for Katy</h2>
-                <span className="text-xs text-bevel-text-secondary dark:text-slate-400">({giftIdeas.length})</span>
-              </div>
-              <ChevronDown className={`w-4 h-4 text-bevel-text-secondary transition-transform ${showGiftIdeas ? 'rotate-180' : ''}`} />
-            </button>
-            {showGiftIdeas && (
-              <div className="px-4 pb-4 space-y-3">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newGiftIdea}
-                    onChange={(e) => setNewGiftIdea(e.target.value)}
-                    onKeyDown={async (e) => {
-                      if (e.key === 'Enter' && newGiftIdea.trim() && user) {
-                        await giftIdeasService.addGiftIdea(user.id, newGiftIdea.trim())
-                        queryClient.invalidateQueries({ queryKey: ['gift-ideas', user.id] })
-                        setNewGiftIdea('')
-                      }
-                    }}
-                    placeholder="Add a gift idea..."
-                    className="flex-1 text-sm px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-bevel-text dark:text-white placeholder-bevel-text-secondary focus:outline-none focus:ring-2 focus:ring-pink-300 dark:focus:ring-pink-500/30"
-                  />
-                  <button
-                    onClick={async () => {
-                      if (newGiftIdea.trim() && user) {
-                        await giftIdeasService.addGiftIdea(user.id, newGiftIdea.trim())
-                        queryClient.invalidateQueries({ queryKey: ['gift-ideas', user.id] })
-                        setNewGiftIdea('')
-                      }
-                    }}
-                    className="px-3 py-2 rounded-lg bg-pink-500 text-white text-sm font-medium hover:bg-pink-600 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-                {giftIdeas.length === 0 ? (
-                  <p className="text-sm text-bevel-text-secondary dark:text-slate-400 italic">No ideas yet — add one whenever inspiration strikes!</p>
-                ) : (
-                  <div className="space-y-2">
-                    {giftIdeas.map((idea) => (
-                      <div key={idea.id} className="flex items-center gap-2 p-2 rounded-lg bg-pink-50/50 dark:bg-pink-500/5">
-                        <button
-                          onClick={async () => {
-                            await giftIdeasService.toggleUsed(idea.id, !idea.used)
-                            queryClient.invalidateQueries({ queryKey: ['gift-ideas', user?.id] })
-                          }}
-                          className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                            idea.used ? 'bg-pink-500 border-pink-500' : 'border-pink-300 dark:border-pink-600 hover:border-pink-400'
-                          }`}
-                        >
-                          {idea.used && <Check className="w-3 h-3 text-white" />}
-                        </button>
-                        <p className={`text-sm flex-1 ${idea.used ? 'text-bevel-text-secondary line-through' : 'text-bevel-text dark:text-slate-300'}`}>{idea.idea}</p>
-                        <button
-                          onClick={async () => {
-                            await giftIdeasService.deleteGiftIdea(idea.id)
-                            queryClient.invalidateQueries({ queryKey: ['gift-ideas', user?.id] })
-                          }}
-                          className="text-bevel-text-secondary hover:text-red-500 transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -2398,7 +2484,7 @@ export default function TodayPage() {
                   <button
                     onClick={handlePlayIdentityAffirmations}
                     disabled={isGeneratingIdentityAudio}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-pink-500 hover:bg-pink-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-identity hover:bg-identity/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Play identities"
                   >
                     {isGeneratingIdentityAudio ? (
@@ -2434,7 +2520,7 @@ export default function TodayPage() {
                             <select
                               value={identityVoice}
                               onChange={(e) => handleIdentityVoiceChange(e.target.value as any)}
-                              className="w-full px-2 py-1.5 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500/50"
+                              className="w-full px-2 py-1.5 text-sm bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-identity/50"
                             >
                               <option value="adam">Adam (deep male)</option>
                               <option value="rachel">Rachel (warm female)</option>
@@ -2458,7 +2544,7 @@ export default function TodayPage() {
                               step="0.05"
                               value={identitySpeed}
                               onChange={(e) => handleIdentitySpeedChange(parseFloat(e.target.value))}
-                              className="w-full h-1.5 bg-gray-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-pink-500"
+                              className="w-full h-1.5 bg-gray-200 dark:bg-slate-600 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-identity"
                             />
                             <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
                               <span>Slow</span>
@@ -2480,7 +2566,7 @@ export default function TodayPage() {
                       setAddType('identity')
                       setShowAddModal(true)
                     }}
-                    className="w-full py-4 px-4 bg-pink-500/10 hover:bg-pink-500/20 border border-dashed border-pink-500/30 rounded-xl text-pink-500 font-medium flex items-center justify-center gap-2 transition-colors"
+                    className="w-full py-4 px-4 bg-identity/10 hover:bg-identity/20 border border-dashed border-identity/30 rounded-xl text-identity font-medium flex items-center justify-center gap-2 transition-colors"
                   >
                     <Plus className="w-5 h-5" />
                     Add Lifestyle
@@ -2855,7 +2941,7 @@ export default function TodayPage() {
 
           {/* AI Journals */}
           {aiJournals.length > 0 && (
-            <section className="bg-gradient-to-br from-cyan-50/50 to-blue-50/50 dark:from-cyan-900/10 dark:to-blue-900/10 rounded-2xl p-4 -mx-4">
+            <section className="rounded-2xl p-4 -mx-4">
               <button
                 onClick={() => toggleSection('aiJournals')}
                 className="w-full flex items-center justify-between mb-4 group cursor-pointer"
@@ -2877,7 +2963,7 @@ export default function TodayPage() {
                       className="bg-bevel-card dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl p-4 border border-gray-100 dark:border-slate-700/50"
                     >
                       <div className="flex items-start gap-3 mb-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 bg-slate-500 rounded-xl flex items-center justify-center flex-shrink-0">
                           <Sparkles className="w-5 h-5 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -2918,7 +3004,7 @@ export default function TodayPage() {
                           <button
                             onClick={() => regenerateAiJournal(journal)}
                             disabled={regeneratingJournalId === journal.id}
-                            className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 text-white text-sm rounded-lg font-medium transition-all flex items-center justify-center gap-2 mx-auto"
+                            className="px-4 py-2 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 text-white text-sm rounded-lg font-medium transition-all flex items-center justify-center gap-2 mx-auto"
                           >
                             {regeneratingJournalId === journal.id ? (
                               <>
@@ -2942,7 +3028,7 @@ export default function TodayPage() {
           )}
 
           {/* Healthy Foods */}
-          <section id="section-meal-plan" className="bg-gradient-to-br from-green-50/50 to-emerald-50/50 dark:from-green-900/10 dark:to-emerald-900/10 rounded-2xl p-4 -mx-4">
+          <section id="section-meal-plan" className="rounded-2xl p-4 -mx-4">
             <button
               onClick={() => toggleSection('healthyFoods')}
               className="w-full flex items-center justify-between mb-4 group cursor-pointer"
@@ -2962,7 +3048,7 @@ export default function TodayPage() {
           </section>
 
           {/* Push-Ups */}
-          <section className="bg-gradient-to-br from-blue-50/50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/10 rounded-2xl p-4 -mx-4">
+          <section className="rounded-2xl p-4 -mx-4">
             <button
               onClick={() => toggleSection('pushups')}
               className="w-full flex items-center justify-between mb-4 group cursor-pointer"
@@ -3240,7 +3326,7 @@ export default function TodayPage() {
           </section>
 
           {/* Books */}
-          <section className="bg-gradient-to-br from-amber-50/50 to-orange-50/50 dark:from-amber-900/10 dark:to-orange-900/10 rounded-2xl p-4 -mx-4">
+          <section className="rounded-2xl p-4 -mx-4">
             <div className="flex items-center justify-between mb-4">
               <button
                 onClick={() => toggleSection('books')}
@@ -3273,7 +3359,7 @@ export default function TodayPage() {
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all"
+                        className="h-full rounded-full bg-slate-400 transition-all"
                         style={{ width: `${Math.min((currentYearBooksRead / BOOKS_GOAL) * 100, 100)}%` }}
                       />
                     </div>
@@ -3375,7 +3461,7 @@ export default function TodayPage() {
           {habits.length === 0 && mantras.length === 0 && prompts.length === 0 && todos.length === 0 && visions.length === 0 && identities.length === 0 && (
             <div className="text-center py-20 px-6">
               <div className="mb-6">
-                <div className="w-20 h-20 mx-auto bg-gradient-to-br from-brand-100 to-brand-50 dark:from-brand-900/30 dark:to-brand-800/20 rounded-3xl flex items-center justify-center shadow-sm">
+                <div className="w-20 h-20 mx-auto bg-slate-100 dark:bg-slate-800/30 rounded-3xl flex items-center justify-center shadow-sm">
                   <Plus className="w-10 h-10 text-brand-500" />
                 </div>
               </div>
@@ -3387,7 +3473,7 @@ export default function TodayPage() {
               </p>
               <button
                 onClick={() => setShowAddModal(true)}
-                className="px-8 py-3.5 bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white rounded-xl font-semibold transition-all shadow-card hover:shadow-card-hover active:scale-[0.98]"
+                className="px-8 py-3.5 bg-slate-600 hover:bg-slate-700 text-white rounded-xl font-semibold transition-all shadow-card hover:shadow-card-hover active:scale-[0.98]"
               >
                 Get Started
               </button>
@@ -3424,8 +3510,8 @@ export default function TodayPage() {
             setShowAddModal(true)
             if (showAddHint) dismissAddHint()
           }}
-          className={`w-14 h-14 bg-gradient-to-br from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 rounded-2xl flex items-center justify-center shadow-bevel-lg hover:shadow-card-hover transition-all active:scale-95 ${
-            showAddHint ? 'ring-4 ring-brand-500/30 animate-pulse' : ''
+          className={`w-14 h-14 bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-500 rounded-2xl flex items-center justify-center shadow-bevel transition-all active:scale-95 ${
+            showAddHint ? 'ring-4 ring-slate-400/30 animate-pulse' : ''
           }`}
         >
           <Plus className="w-7 h-7 text-white" />
@@ -3472,10 +3558,10 @@ export default function TodayPage() {
                     { type: 'journal' as const, label: 'Journal', key: 'J', color: 'bg-journal hover:bg-journal/90' },
                     { type: 'todo' as const, label: 'To-Do', key: 'T', color: 'bg-blue-500 hover:bg-blue-600' },
                     { type: 'vision' as const, label: 'Vision', key: 'V', color: 'bg-blue-600 hover:bg-blue-700' },
-                    { type: 'identity' as const, label: 'Lifestyle', key: 'I', color: 'bg-pink-500 hover:bg-pink-600' },
+                    { type: 'identity' as const, label: 'Lifestyle', key: 'I', color: 'bg-identity hover:bg-brand-600' },
                     { type: 'book' as const, label: 'Book', key: 'B', color: 'bg-amber-500 hover:bg-amber-600' },
-                    { type: 'pep-talk' as const, label: 'Pep Talk', key: 'P', color: 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600' },
-                    { type: 'ai-journal' as const, label: 'AI Journal', key: 'A', color: 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600' },
+                    { type: 'pep-talk' as const, label: 'Pep Talk', key: 'P', color: 'bg-slate-600 hover:bg-slate-700' },
+                    { type: 'ai-journal' as const, label: 'AI Journal', key: 'A', color: 'bg-slate-600 hover:bg-slate-700' },
                   ].map(({ type, label, key, color }) => (
                     <button
                       key={type}
@@ -3525,7 +3611,7 @@ export default function TodayPage() {
                 <button
                   onClick={() => pepTalkMutation.mutate()}
                   disabled={pepTalkMutation.isPending || goals.length === 0}
-                  className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
                 >
                   {pepTalkMutation.isPending ? (
                     <>
@@ -3556,7 +3642,7 @@ export default function TodayPage() {
                       }
                     }}
                     disabled={!newItemText.trim() || savePepTalkMutation.isPending}
-                    className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+                    className="flex-1 py-3 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
                   >
                     {savePepTalkMutation.isPending ? 'Saving...' : 'Save for Today'}
                   </button>
@@ -3597,7 +3683,7 @@ export default function TodayPage() {
                     <button
                       onClick={() => generateAiJournal()}
                       disabled={isGeneratingAiJournal || !aiJournalPrompt.trim()}
-                      className="flex-1 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                      className="flex-1 py-3 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 text-white rounded-lg font-medium transition-all flex items-center justify-center gap-2"
                     >
                       {isGeneratingAiJournal ? (
                         <>
@@ -3627,7 +3713,7 @@ export default function TodayPage() {
                         }
                       }}
                       disabled={!aiJournalPrompt.trim() || createAiJournalMutation.isPending}
-                      className="flex-1 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+                      className="flex-1 py-3 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
                     >
                       Save Prompt
                     </button>
@@ -3646,7 +3732,7 @@ export default function TodayPage() {
                   </div>
                 ) : addType === 'identity' ? (
                   <div className="mb-3">
-                    <p className="text-sm text-pink-500 font-medium mb-2">I live the lifestyle of...</p>
+                    <p className="text-sm text-identity font-medium mb-2">I live the lifestyle of...</p>
                     <textarea
                       value={newItemText}
                       onChange={(e) => setNewItemText(e.target.value)}
@@ -3655,7 +3741,7 @@ export default function TodayPage() {
                           e.currentTarget.blur()
                         }
                       }}
-                      className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pink-500 resize-none"
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-identity resize-none"
                       placeholder="a community organizer..."
                       rows={3}
                       autoFocus
@@ -4205,11 +4291,11 @@ export default function TodayPage() {
             {isEditingIdentity ? (
               <>
                 <div className="mb-4">
-                  <p className="text-sm text-pink-500 font-medium mb-2">I live the lifestyle of...</p>
+                  <p className="text-sm text-identity font-medium mb-2">I live the lifestyle of...</p>
                   <textarea
                     value={editIdentityText}
                     onChange={(e) => setEditIdentityText(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pink-500 resize-none"
+                    className="w-full px-4 py-3 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-identity resize-none"
                     placeholder="a community organizer..."
                     rows={3}
                     autoFocus
@@ -4232,7 +4318,7 @@ export default function TodayPage() {
                       }
                     }}
                     disabled={!editIdentityText.trim() || updateIdentityMutation.isPending}
-                    className="flex-1 py-3 bg-pink-500 hover:bg-pink-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+                    className="flex-1 py-3 bg-identity hover:bg-brand-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
                   >
                     {updateIdentityMutation.isPending ? 'Saving...' : 'Save'}
                   </button>
@@ -4241,7 +4327,7 @@ export default function TodayPage() {
             ) : (
               <>
                 <div className="mb-6">
-                  <p className="text-sm text-pink-500 font-medium mb-1">I live the lifestyle of...</p>
+                  <p className="text-sm text-identity font-medium mb-1">I live the lifestyle of...</p>
                   <div
                     className="text-gray-600 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none [&_p]:m-0"
                     dangerouslySetInnerHTML={{ __html: selectedIdentity.text }}
@@ -4253,7 +4339,7 @@ export default function TodayPage() {
                       setEditIdentityText(selectedIdentity.text.replace(/<br\s*\/?>/g, '\n'))
                       setIsEditingIdentity(true)
                     }}
-                    className="w-full py-3 bg-pink-50 dark:bg-pink-500/10 hover:bg-pink-100 dark:hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-identity/10 dark:bg-identity/10 hover:bg-identity/20 dark:hover:bg-identity/20 text-identity rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                   >
                     <Pencil className="w-5 h-5" />
                     Edit Lifestyle
@@ -4566,7 +4652,7 @@ export default function TodayPage() {
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 bg-slate-500 rounded-xl flex items-center justify-center flex-shrink-0">
                   <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">AI Journal</h2>
@@ -4602,7 +4688,7 @@ export default function TodayPage() {
                   setSelectedAiJournal(null)
                 }}
                 disabled={regeneratingJournalId === selectedAiJournal.id}
-                className="w-full py-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                className="w-full py-3 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
               >
                 <RefreshCw className={`w-5 h-5 ${regeneratingJournalId === selectedAiJournal.id ? 'animate-spin' : ''}`} />
                 Regenerate Content

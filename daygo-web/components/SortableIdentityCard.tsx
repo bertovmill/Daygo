@@ -46,7 +46,7 @@ export function SortableIdentityCard({ identity, onEdit }: SortableIdentityCardP
         isDragging
           ? 'opacity-50 shadow-bevel-lg scale-[1.02]'
           : isGlowing
-            ? 'shadow-bevel-lg scale-[1.02] ring-2 ring-pink-500/30'
+            ? 'shadow-bevel-lg scale-[1.02] ring-2 ring-identity/30'
             : 'shadow-bevel hover:shadow-bevel-md'
       }`}
     >
@@ -64,10 +64,10 @@ export function SortableIdentityCard({ identity, onEdit }: SortableIdentityCardP
         <div className={`flex-shrink-0 transition-all duration-200 ${
           isGlowing ? 'scale-125' : ''
         }`}>
-          <User className="w-6 h-6 text-pink-500" />
+          <User className="w-6 h-6 text-identity" />
         </div>
         <div className="flex-1">
-          <span className="text-xs font-semibold text-pink-500 uppercase tracking-wide">I live the lifestyle of</span>
+          <span className="text-xs font-semibold text-identity uppercase tracking-wide">I live the lifestyle of</span>
           <div
             className="text-bevel-text dark:text-white prose prose-sm dark:prose-invert max-w-none [&_p]:m-0 font-medium leading-relaxed mt-1"
             dangerouslySetInnerHTML={{ __html: identity.text }}

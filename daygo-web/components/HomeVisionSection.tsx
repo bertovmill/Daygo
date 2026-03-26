@@ -1,69 +1,84 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Flame, ChevronDown, Check, X, Plus, Pencil, Trash2, Hash, BarChart3 } from 'lucide-react'
-import { homeVisionsService, normalizePillarItems, type HomeVision, type HomeVisionPillar, type PillarItem } from '@/lib/services/homeVisions'
-import { visionChecklistLogsService, type ChecklistState, type VisionChecklistLog } from '@/lib/services/visionChecklistLogs'
+import { Flame, ChevronDown, Check, X, Plus, Pencil, Trash2, CalendarClock, Target, TrendingUp } from 'lucide-react'
+import {
+  homeVisionsService,
+  type HomeVisionPillar,
+  type HomeVisionMetricKind,
+  type PillarItem,
+  normalizePillarItems,
+} from '@/lib/services/homeVisions'
 import confetti from 'canvas-confetti'
 
 const PILLAR_COLORS = {
   emerald: {
-    border: 'border-emerald-200/60 dark:border-emerald-500/20',
-    hoverBg: 'hover:bg-emerald-50/50 dark:hover:bg-emerald-500/5',
-    gradient: 'from-emerald-400 to-teal-500',
-    label: 'text-emerald-500 dark:text-emerald-400',
-    tagline: 'text-emerald-600 dark:text-emerald-400',
-    checkHover: 'group-hover:border-emerald-400',
-    checked: 'bg-emerald-500 border-emerald-500',
-    metricBg: 'bg-emerald-50 dark:bg-emerald-500/10',
-    metricRing: 'focus:ring-emerald-500/50',
+    border: 'border-slate-200/70 dark:border-slate-600/30',
+    hoverBg: 'hover:bg-slate-50/80 dark:hover:bg-slate-800/30',
+    gradient: 'from-slate-400 via-slate-500 to-slate-600',
+    tint: 'from-slate-50 via-white to-slate-100/60 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/80',
+    badge: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    soft: 'bg-slate-50/80 dark:bg-slate-800/50',
+    label: 'text-slate-500 dark:text-slate-400',
+    accentText: 'text-slate-600 dark:text-slate-300',
+    checkHover: 'group-hover:border-slate-400',
+    checked: 'bg-slate-500 border-slate-500',
+    progress: 'from-slate-500 to-slate-700',
   },
   sky: {
-    border: 'border-sky-200/60 dark:border-sky-500/20',
-    hoverBg: 'hover:bg-sky-50/50 dark:hover:bg-sky-500/5',
-    gradient: 'from-sky-400 to-blue-500',
-    label: 'text-sky-500 dark:text-sky-400',
-    tagline: 'text-sky-600 dark:text-sky-400',
-    checkHover: 'group-hover:border-sky-400',
-    checked: 'bg-sky-500 border-sky-500',
-    metricBg: 'bg-sky-50 dark:bg-sky-500/10',
-    metricRing: 'focus:ring-sky-500/50',
+    border: 'border-slate-200/70 dark:border-slate-600/30',
+    hoverBg: 'hover:bg-blue-50/60 dark:hover:bg-blue-950/20',
+    gradient: 'from-slate-400 via-blue-400 to-cyan-400',
+    tint: 'from-blue-50 via-white to-cyan-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-blue-950/40',
+    badge: 'bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300',
+    soft: 'bg-blue-50/70 dark:bg-blue-950/20',
+    label: 'text-blue-500/80 dark:text-blue-300/80',
+    accentText: 'text-blue-700 dark:text-blue-300',
+    checkHover: 'group-hover:border-blue-400',
+    checked: 'bg-blue-500 border-blue-500',
+    progress: 'from-blue-500 to-cyan-500',
   },
   purple: {
-    border: 'border-purple-200/60 dark:border-purple-500/20',
-    hoverBg: 'hover:bg-purple-50/50 dark:hover:bg-purple-500/5',
-    gradient: 'from-purple-400 to-violet-500',
-    label: 'text-purple-500 dark:text-purple-400',
-    tagline: 'text-purple-600 dark:text-purple-400',
-    checkHover: 'group-hover:border-purple-400',
-    checked: 'bg-purple-500 border-purple-500',
-    metricBg: 'bg-purple-50 dark:bg-purple-500/10',
-    metricRing: 'focus:ring-purple-500/50',
+    border: 'border-slate-200/70 dark:border-slate-600/30',
+    hoverBg: 'hover:bg-violet-50/60 dark:hover:bg-violet-950/20',
+    gradient: 'from-slate-400 via-violet-400 to-fuchsia-400',
+    tint: 'from-violet-50 via-white to-fuchsia-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-violet-950/30',
+    badge: 'bg-violet-50 text-violet-600 dark:bg-violet-950/40 dark:text-violet-300',
+    soft: 'bg-violet-50/70 dark:bg-violet-950/20',
+    label: 'text-violet-500/80 dark:text-violet-300/80',
+    accentText: 'text-violet-700 dark:text-violet-300',
+    checkHover: 'group-hover:border-violet-400',
+    checked: 'bg-violet-500 border-violet-500',
+    progress: 'from-violet-500 to-fuchsia-500',
   },
   amber: {
-    border: 'border-amber-200/60 dark:border-amber-500/20',
-    hoverBg: 'hover:bg-amber-50/50 dark:hover:bg-amber-500/5',
-    gradient: 'from-amber-400 to-orange-500',
-    label: 'text-amber-500 dark:text-amber-400',
-    tagline: 'text-amber-600 dark:text-amber-400',
+    border: 'border-slate-200/70 dark:border-slate-600/30',
+    hoverBg: 'hover:bg-amber-50/60 dark:hover:bg-amber-950/20',
+    gradient: 'from-slate-400 via-amber-400 to-orange-400',
+    tint: 'from-amber-50 via-white to-orange-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-amber-950/30',
+    badge: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+    soft: 'bg-amber-50/70 dark:bg-amber-950/20',
+    label: 'text-amber-600/80 dark:text-amber-300/80',
+    accentText: 'text-amber-700 dark:text-amber-300',
     checkHover: 'group-hover:border-amber-400',
     checked: 'bg-amber-500 border-amber-500',
-    metricBg: 'bg-amber-50 dark:bg-amber-500/10',
-    metricRing: 'focus:ring-amber-500/50',
+    progress: 'from-amber-500 to-orange-500',
   },
   rose: {
-    border: 'border-rose-200/60 dark:border-rose-500/20',
-    hoverBg: 'hover:bg-rose-50/50 dark:hover:bg-rose-500/5',
-    gradient: 'from-rose-400 to-pink-500',
-    label: 'text-rose-500 dark:text-rose-400',
-    tagline: 'text-rose-600 dark:text-rose-400',
+    border: 'border-slate-200/70 dark:border-slate-600/30',
+    hoverBg: 'hover:bg-rose-50/60 dark:hover:bg-rose-950/20',
+    gradient: 'from-slate-400 via-rose-400 to-pink-400',
+    tint: 'from-rose-50 via-white to-pink-50/60 dark:from-slate-900 dark:via-slate-900 dark:to-rose-950/30',
+    badge: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+    soft: 'bg-rose-50/70 dark:bg-rose-950/20',
+    label: 'text-rose-500/80 dark:text-rose-300/80',
+    accentText: 'text-rose-700 dark:text-rose-300',
     checkHover: 'group-hover:border-rose-400',
     checked: 'bg-rose-500 border-rose-500',
-    metricBg: 'bg-rose-50 dark:bg-rose-500/10',
-    metricRing: 'focus:ring-rose-500/50',
+    progress: 'from-rose-500 to-pink-500',
   },
-}
+} as const
 
 const COLOR_OPTIONS: { value: HomeVisionPillar['color']; label: string }[] = [
   { value: 'emerald', label: 'Green' },
@@ -73,116 +88,261 @@ const COLOR_OPTIONS: { value: HomeVisionPillar['color']; label: string }[] = [
   { value: 'rose', label: 'Rose' },
 ]
 
+const METRIC_OPTIONS: { value: HomeVisionMetricKind; label: string }[] = [
+  { value: 'currency_millions', label: 'ARR ($M)' },
+  { value: 'count', label: 'Count' },
+  { value: 'time_seconds', label: 'Time (seconds)' },
+]
+
 interface HomeVisionSectionProps {
   userId: string
   selectedDate: Date
+}
+
+type EditableHomeVision = {
+  title: string
+  subtitle: string
+  pillars: HomeVisionPillar[]
+}
+
+type NormalizedHomeVisionPillar = HomeVisionPillar & {
+  items: PillarItem[]
+  current_value: number | null
+  target_value: number | null
+  metric_kind: HomeVisionMetricKind | null
+  current_label: string | null
+  target_label: string | null
+  baseline_date: string | null
+  target_date: string | null
 }
 
 function formatDate(d: Date) {
   return d.toISOString().split('T')[0]
 }
 
+function getYearEndDate(date: Date) {
+  return `${date.getFullYear()}-12-31`
+}
+
+function parseOptionalNumber(value: string): number | null {
+  if (!value.trim()) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatCompactDate(value?: string | null) {
+  if (!value) return null
+  const parsed = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function formatMetricValue(value: number | null | undefined, kind: HomeVisionMetricKind | null | undefined) {
+  if (value === null || value === undefined || !kind) return 'Set metric'
+
+  if (kind === 'currency_millions') {
+    return `$${value.toFixed(value >= 10 ? 0 : 1)}M`
+  }
+
+  if (kind === 'count') {
+    return new Intl.NumberFormat('en-US').format(Math.round(value))
+  }
+
+  const totalSeconds = Math.max(0, Math.round(value))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+function formatGapValue(pillar: NormalizedHomeVisionPillar) {
+  const { current_value, target_value, metric_kind } = pillar
+
+  if (current_value === null || target_value === null || !metric_kind) {
+    return 'Define the gap'
+  }
+
+  if (metric_kind === 'time_seconds') {
+    const gap = Math.max(0, current_value - target_value)
+    return gap > 0 ? `${formatMetricValue(gap, metric_kind)} faster` : 'At target'
+  }
+
+  const gap = Math.max(0, target_value - current_value)
+  if (metric_kind === 'currency_millions') return `${formatMetricValue(gap, metric_kind)} to close`
+  return `${formatMetricValue(gap, metric_kind)} to add`
+}
+
+function getProgressPercent(pillar: NormalizedHomeVisionPillar) {
+  const { current_value, target_value, metric_kind } = pillar
+
+  if (current_value === null || target_value === null || !metric_kind || target_value <= 0 || current_value < 0) {
+    return null
+  }
+
+  const rawPercent = metric_kind === 'time_seconds'
+    ? (target_value / current_value) * 100
+    : (current_value / target_value) * 100
+
+  return Math.max(6, Math.min(100, rawPercent))
+}
+
+function getRateToGoalText(pillar: NormalizedHomeVisionPillar, selectedDate: Date) {
+  const { current_value, target_value, metric_kind, target_date } = pillar
+  if (current_value === null || target_value === null || !metric_kind || !target_date) return null
+
+  const end = new Date(`${target_date}T00:00:00`)
+  if (Number.isNaN(end.getTime())) return null
+
+  const msRemaining = end.getTime() - selectedDate.getTime()
+  const daysRemaining = Math.ceil(msRemaining / (1000 * 60 * 60 * 24))
+  if (daysRemaining <= 0) return null
+
+  const prettyDate = formatCompactDate(target_date)
+  if (!prettyDate) return null
+
+  if (metric_kind === 'time_seconds') {
+    const secondsToCut = current_value - target_value
+    if (secondsToCut <= 0) return `You are already at or ahead of the ${prettyDate} target.`
+    const perWeek = secondsToCut / Math.max(daysRemaining / 7, 1)
+    return `To hit ${prettyDate}, you need to shave about ${Math.round(perWeek)} sec per week.`
+  }
+
+  const gap = target_value - current_value
+  if (gap <= 0) return `You are already at or ahead of the ${prettyDate} target.`
+
+  if (metric_kind === 'currency_millions') {
+    const perMonth = gap / Math.max(daysRemaining / 30.44, 1)
+    const perWeek = gap / Math.max(daysRemaining / 7, 1)
+    return `To hit ${prettyDate}, close about ${formatMetricValue(perMonth, metric_kind)}/month (${formatMetricValue(perWeek, metric_kind)}/week).`
+  }
+
+  const perWeek = gap / Math.max(daysRemaining / 7, 1)
+  const perMonth = gap / Math.max(daysRemaining / 30.44, 1)
+  return `To hit ${prettyDate}, add about ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(perWeek))}/week (${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(perMonth))}/month).`
+}
+
+function getPillarDefaults(pillar: HomeVisionPillar, selectedDate: Date): Partial<HomeVisionPillar> {
+  const label = pillar.label.toLowerCase()
+  const goal = pillar.goal.toLowerCase()
+  const yearEnd = getYearEndDate(selectedDate)
+
+  if (goal.includes('5m arr') || label.includes('gtm')) {
+    return {
+      current_value: 1.7,
+      target_value: 5,
+      metric_kind: 'currency_millions',
+      current_label: 'Now',
+      target_label: 'Target',
+      target_date: yearEnd,
+      items: pillar.items?.length
+        ? pillar.items
+        : [
+            'Turn the GTM playbook into a weekly operating system the team can actually run.',
+            'Increase pipeline creation and conversion every week, not just at quarter-end.',
+            'Build repeatable execution loops for positioning, outbound, demos, and expansion.',
+          ],
+    }
+  }
+
+  if (goal.includes('makers lounge') || label.includes('community')) {
+    return {
+      current_value: 650,
+      target_value: 10000,
+      metric_kind: 'count',
+      current_label: 'Luma now',
+      target_label: 'Luma target',
+      target_date: yearEnd,
+      items: pillar.items?.length
+        ? pillar.items
+        : [
+            'Run one high-signal event every week and design it to generate follow-on invitations.',
+            'Turn members into hosts, connectors, and repeat collaborators inside the community.',
+            'Make helping each other win visible so contribution becomes the default behavior.',
+          ],
+    }
+  }
+
+  if (goal.includes('hyrox') || label.includes('athlete')) {
+    return {
+      current_value: (57 * 60) + 29,
+      target_value: (54 * 60) + 59,
+      metric_kind: 'time_seconds',
+      current_label: 'Last race',
+      target_label: 'Sub-55',
+      target_date: `${selectedDate.getFullYear()}-05-15`,
+      items: pillar.items?.length
+        ? pillar.items
+        : [
+            'Commit to a Hyrox-specific training block with running, strength endurance, and compromised effort.',
+            'Sharpen race pacing, transitions, and station efficiency so free seconds stop leaking.',
+            'Protect recovery, fueling, and consistency so the full block compounds before race day.',
+          ],
+    }
+  }
+
+  return {}
+}
+
+function normalizePillar(pillar: HomeVisionPillar, selectedDate: Date): NormalizedHomeVisionPillar {
+  const defaults = getPillarDefaults(pillar, selectedDate)
+  const merged = { ...defaults, ...pillar }
+
+  return {
+    ...merged,
+    items: normalizePillarItems(merged.items || []),
+    current_value: merged.current_value ?? null,
+    target_value: merged.target_value ?? null,
+    metric_kind: merged.metric_kind ?? null,
+    current_label: merged.current_label ?? null,
+    target_label: merged.target_label ?? null,
+    baseline_date: merged.baseline_date ?? null,
+    target_date: merged.target_date ?? null,
+  }
+}
+
 export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionProps) {
   const queryClient = useQueryClient()
-  const [expandedGoal, setExpandedGoal] = useState<number | null>(null)
+  const [expandedGoal, setExpandedGoal] = useState<number | null>(0)
   const [isEditing, setIsEditing] = useState(false)
-  const [editData, setEditData] = useState<{
-    title: string
-    subtitle: string
-    pillars: HomeVisionPillar[]
-  } | null>(null)
+  const [editData, setEditData] = useState<EditableHomeVision | null>(null)
 
-  const [showProgress, setShowProgress] = useState(false)
-  const [progressRange, setProgressRange] = useState<'week' | 'month' | 'year'>('week')
-
-  // Daily checklist state (Supabase)
   const dateKey = formatDate(selectedDate)
+  const [mitChecked, setMitChecked] = useState<Record<string, boolean>>({})
 
-  const { data: logState = {} } = useQuery({
-    queryKey: ['visionChecklist', userId, dateKey],
-    queryFn: () => visionChecklistLogsService.getLogsForDate(userId, dateKey),
-    enabled: !!userId,
-  })
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(`daygo-hv-${dateKey}`) || '{}')
+      setMitChecked(stored)
+    } catch {
+      setMitChecked({})
+    }
+  }, [dateKey])
 
-  const toggleMutation = useMutation({
-    mutationFn: ({ pillarIndex, itemIndex, completed }: { pillarIndex: number; itemIndex: number; completed: boolean }) =>
-      visionChecklistLogsService.toggleItem(userId, pillarIndex, itemIndex, dateKey, completed),
-    onMutate: async ({ pillarIndex, itemIndex, completed }) => {
-      const key = `hv-${pillarIndex}-${itemIndex}`
-      const queryKey = ['visionChecklist', userId, dateKey]
-      await queryClient.cancelQueries({ queryKey })
-      const previous = queryClient.getQueryData<Record<string, ChecklistState>>(queryKey)
-      queryClient.setQueryData(queryKey, (old: Record<string, ChecklistState> = {}) => ({
-        ...old,
-        [key]: { ...old[key], completed, value: old[key]?.value ?? null },
-      }))
-      return { previous }
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(['visionChecklist', userId, dateKey], context.previous)
-      }
-    },
-  })
-
-  const metricMutation = useMutation({
-    mutationFn: ({ pillarIndex, itemIndex, value, target }: { pillarIndex: number; itemIndex: number; value: number; target: number }) =>
-      visionChecklistLogsService.logMetric(userId, pillarIndex, itemIndex, dateKey, value, target),
-    onMutate: async ({ pillarIndex, itemIndex, value, target }) => {
-      const key = `hv-${pillarIndex}-${itemIndex}`
-      const queryKey = ['visionChecklist', userId, dateKey]
-      await queryClient.cancelQueries({ queryKey })
-      const previous = queryClient.getQueryData<Record<string, ChecklistState>>(queryKey)
-      queryClient.setQueryData(queryKey, (old: Record<string, ChecklistState> = {}) => ({
-        ...old,
-        [key]: { completed: value >= target, value },
-      }))
-      return { previous }
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(['visionChecklist', userId, dateKey], context.previous)
-      }
-    },
-  })
+  useEffect(() => {
+    if (Object.keys(mitChecked).length > 0) {
+      localStorage.setItem(`daygo-hv-${dateKey}`, JSON.stringify(mitChecked))
+    }
+  }, [mitChecked, dateKey])
 
   const toggleMit = useCallback((key: string, e: React.MouseEvent) => {
-    const state = logState[key]
-    const willCheck = !state?.completed
-    const parts = key.split('-')
-    const pillarIndex = parseInt(parts[1])
-    const itemIndex = parseInt(parts[2])
-    toggleMutation.mutate({ pillarIndex, itemIndex, completed: willCheck })
+    const willCheck = !mitChecked[key]
+    setMitChecked((prev: Record<string, boolean>) => ({ ...prev, [key]: willCheck }))
     if (willCheck) {
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
       const x = (rect.left + 10) / window.innerWidth
       const y = (rect.top + 10) / window.innerHeight
       confetti({ particleCount: 30, spread: 60, origin: { x, y }, startVelocity: 18, gravity: 0.8, scalar: 0.7, ticks: 50 })
     }
-  }, [logState, toggleMutation])
-
-  const handleMetricChange = useCallback((pillarIndex: number, itemIndex: number, value: number, target: number) => {
-    metricMutation.mutate({ pillarIndex, itemIndex, value, target })
-    if (value >= target) {
-      confetti({ particleCount: 40, spread: 70, startVelocity: 20, gravity: 0.8, scalar: 0.8, ticks: 60 })
-    }
-  }, [metricMutation])
-
-  // Progress data
-  const progressDates = useMemo(() => {
-    const now = new Date(dateKey)
-    const start = new Date(now)
-    if (progressRange === 'week') start.setDate(now.getDate() - 6)
-    else if (progressRange === 'month') start.setDate(now.getDate() - 29)
-    else start.setMonth(0, 1) // Jan 1 of current year
-    return { start: formatDate(start), end: dateKey }
-  }, [dateKey, progressRange])
-
-  const { data: progressLogs = [] } = useQuery({
-    queryKey: ['visionProgress', userId, progressDates.start, progressDates.end],
-    queryFn: () => visionChecklistLogsService.getLogsForRange(userId, progressDates.start, progressDates.end),
-    enabled: !!userId && showProgress,
-  })
+  }, [mitChecked])
 
   const { data: homeVision, isLoading } = useQuery({
     queryKey: ['homeVision', userId],
@@ -211,37 +371,43 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
 
   const startEditing = useCallback(() => {
     if (homeVision) {
-      const rawPillars = Array.isArray(homeVision.pillars)
+      const pillars = Array.isArray(homeVision.pillars)
         ? homeVision.pillars
         : typeof homeVision.pillars === 'string'
           ? JSON.parse(homeVision.pillars)
           : []
-      // Normalize legacy string items to PillarItem objects
-      const pillars = rawPillars.map((p: any) => ({
-        ...p,
-        items: normalizePillarItems(p.items || []),
-      }))
+
       setEditData({
         title: homeVision.title,
         subtitle: homeVision.subtitle || '',
-        pillars: pillars as HomeVisionPillar[],
+        pillars: (pillars as HomeVisionPillar[]).map((pillar) => ({
+          ...normalizePillar(pillar, selectedDate),
+          items: normalizePillarItems(pillar.items || []),
+        })),
       })
     } else {
       setEditData({
-        title: 'My Vision',
-        subtitle: '',
+        title: 'My Vision 2026',
+        subtitle: 'See the distance between where you are and where you are going.',
         pillars: [],
       })
     }
     setIsEditing(true)
-  }, [homeVision])
+  }, [homeVision, selectedDate])
 
   const handleSave = useCallback(() => {
     if (!editData) return
     upsertMutation.mutate({
       title: editData.title,
       subtitle: editData.subtitle || null,
-      pillars: editData.pillars,
+      pillars: editData.pillars.map((pillar) => ({
+        ...pillar,
+        items: normalizePillarItems(pillar.items || []).map((item) => ({
+          label: item.label,
+          type: item.type || 'checkbox',
+          ...(item.target !== undefined ? { target: item.target } : {}),
+        })),
+      })),
     })
   }, [editData, upsertMutation])
 
@@ -251,10 +417,22 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
       ...editData,
       pillars: [
         ...editData.pillars,
-        { label: '', goal: '', tagline: '', color: 'emerald', items: [] },
+        {
+          label: '',
+          goal: '',
+          tagline: '',
+          color: 'emerald',
+          items: [],
+          current_value: null,
+          target_value: null,
+          metric_kind: 'count',
+          current_label: 'Now',
+          target_label: 'Target',
+          target_date: getYearEndDate(selectedDate),
+        },
       ],
     })
-  }, [editData])
+  }, [editData, selectedDate])
 
   const updatePillar = useCallback((index: number, updates: Partial<HomeVisionPillar>) => {
     if (!editData) return
@@ -268,24 +446,22 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
     setEditData({ ...editData, pillars: editData.pillars.filter((_: HomeVisionPillar, i: number) => i !== index) })
   }, [editData])
 
-  const addPillarItem = useCallback((pillarIndex: number, type: 'checkbox' | 'metric') => {
+  const addPillarItem = useCallback((pillarIndex: number) => {
     if (!editData) return
     const newPillars = [...editData.pillars]
-    const newItem: PillarItem = type === 'metric'
-      ? { label: '', type: 'metric', target: 5 }
-      : { label: '', type: 'checkbox' }
+    const currentItems = normalizePillarItems(newPillars[pillarIndex].items || [])
     newPillars[pillarIndex] = {
       ...newPillars[pillarIndex],
-      items: [...newPillars[pillarIndex].items, newItem],
+      items: [...currentItems, { label: '', type: 'checkbox' }],
     }
     setEditData({ ...editData, pillars: newPillars })
   }, [editData])
 
-  const updatePillarItem = useCallback((pillarIndex: number, itemIndex: number, updates: Partial<PillarItem>) => {
+  const updatePillarItem = useCallback((pillarIndex: number, itemIndex: number, value: string) => {
     if (!editData) return
     const newPillars = [...editData.pillars]
-    const newItems = [...newPillars[pillarIndex].items]
-    newItems[itemIndex] = { ...newItems[itemIndex], ...updates }
+    const newItems = normalizePillarItems(newPillars[pillarIndex].items || [])
+    newItems[itemIndex] = { ...newItems[itemIndex], label: value }
     newPillars[pillarIndex] = { ...newPillars[pillarIndex], items: newItems }
     setEditData({ ...editData, pillars: newPillars })
   }, [editData])
@@ -295,39 +471,37 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
     const newPillars = [...editData.pillars]
     newPillars[pillarIndex] = {
       ...newPillars[pillarIndex],
-      items: newPillars[pillarIndex].items.filter((_: PillarItem, i: number) => i !== itemIndex),
+      items: normalizePillarItems(newPillars[pillarIndex].items || []).filter((_: PillarItem, i: number) => i !== itemIndex),
     }
     setEditData({ ...editData, pillars: newPillars })
   }, [editData])
 
   if (isLoading) return null
 
-  // No home vision and not editing - show create button
   if (!homeVision && !isEditing) {
     return (
       <div className="mb-10">
         <button
           onClick={startEditing}
-          className="w-full py-4 px-4 bg-orange-500/10 hover:bg-orange-500/20 border border-dashed border-orange-500/30 rounded-2xl text-orange-600 dark:text-orange-400 font-medium flex items-center justify-center gap-2 transition-colors"
+          className="w-full py-4 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-dashed border-slate-300 dark:border-slate-600 rounded-2xl text-slate-500 dark:text-slate-400 font-medium flex items-center justify-center gap-2 transition-colors"
         >
           <Flame className="w-5 h-5" />
-          Create Your Vision
+          Create Your Vision Roadmap!
         </button>
       </div>
     )
   }
 
-  // Edit modal
   if (isEditing && editData) {
     return (
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start justify-center p-4 pt-12 z-50 overflow-y-auto">
         <div
-          className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-lg shadow-2xl mb-12"
+          className="bg-white dark:bg-slate-900 rounded-2xl p-5 w-full max-w-2xl shadow-2xl mb-12"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-              {homeVision ? 'Edit Vision' : 'Create Vision'}
+              {homeVision ? 'Edit Vision Map' : 'Create Vision Map'}
             </h2>
             <button
               onClick={() => { setIsEditing(false); setEditData(null) }}
@@ -338,155 +512,204 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
           </div>
 
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-            {/* Title */}
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Title</label>
               <input
                 type="text"
                 value={editData.title}
                 onChange={(e) => setEditData({ ...editData, title: e.target.value })}
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                placeholder="My Vision"
+                className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/40"
+                placeholder="My Vision 2026"
               />
             </div>
 
-            {/* Subtitle */}
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Subtitle</label>
               <input
                 type="text"
                 value={editData.subtitle}
                 onChange={(e) => setEditData({ ...editData, subtitle: e.target.value })}
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                placeholder="The life I'm building..."
+                className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/40"
+                placeholder="See the distance between where you are and where you are going."
               />
             </div>
 
-            {/* Pillars */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-medium text-gray-500 dark:text-slate-400">Pillars</label>
                 <button
                   onClick={addPillar}
-                  className="text-xs text-orange-500 hover:text-orange-600 font-medium flex items-center gap-1"
+                  className="text-xs text-slate-600 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white font-medium flex items-center gap-1"
                 >
                   <Plus className="w-3 h-3" /> Add Pillar
                 </button>
               </div>
 
               <div className="space-y-4">
-                {editData.pillars.map((pillar, pi) => (
-                  <div key={pi} className="border border-gray-200 dark:border-slate-700 rounded-xl p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-gray-400 dark:text-slate-500">Pillar {pi + 1}</span>
-                      <button onClick={() => removePillar(pi)} className="p-1 text-red-400 hover:text-red-500">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      value={pillar.label}
-                      onChange={(e) => updatePillar(pi, { label: e.target.value })}
-                      className="w-full px-3 py-1.5 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                      placeholder="Label (e.g. AI GTM Leader)"
-                    />
-                    <textarea
-                      value={pillar.goal}
-                      onChange={(e) => updatePillar(pi, { goal: e.target.value })}
-                      className="w-full px-3 py-1.5 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50 resize-none"
-                      placeholder="Goal description"
-                      rows={2}
-                    />
-                    <input
-                      type="text"
-                      value={pillar.tagline}
-                      onChange={(e) => updatePillar(pi, { tagline: e.target.value })}
-                      className="w-full px-3 py-1.5 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                      placeholder="Motivational tagline (shown when expanded)"
-                    />
-                    <div>
-                      <label className="block text-xs text-gray-400 dark:text-slate-500 mb-1">Color</label>
-                      <div className="flex gap-2">
-                        {COLOR_OPTIONS.map(({ value, label }) => (
-                          <button
-                            key={value}
-                            onClick={() => updatePillar(pi, { color: value })}
-                            className={`px-2 py-1 text-xs rounded-lg border transition-all ${
-                              pillar.color === value
-                                ? 'border-gray-900 dark:border-white bg-gray-100 dark:bg-slate-700 font-bold'
-                                : 'border-gray-200 dark:border-slate-700 hover:border-gray-400'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
+                {editData.pillars.map((pillar, pi) => {
+                  const items = normalizePillarItems(pillar.items || [])
+                  return (
+                    <div key={pi} className="border border-gray-200 dark:border-slate-700 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-400 dark:text-slate-500">Pillar {pi + 1}</span>
+                        <button onClick={() => removePillar(pi)} className="p-1 text-red-400 hover:text-red-500">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                    </div>
 
-                    {/* Items */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs text-gray-400 dark:text-slate-500">Daily actions</label>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => addPillarItem(pi, 'checkbox')}
-                            className="text-xs text-orange-500 hover:text-orange-600 font-medium flex items-center gap-0.5"
-                          >
-                            <Check className="w-3 h-3" /> Checkbox
-                          </button>
-                          <button
-                            onClick={() => addPillarItem(pi, 'metric')}
-                            className="text-xs text-blue-500 hover:text-blue-600 font-medium flex items-center gap-0.5"
-                          >
-                            <Hash className="w-3 h-3" /> Metric
-                          </button>
+                      <input
+                        type="text"
+                        value={pillar.label}
+                        onChange={(e) => updatePillar(pi, { label: e.target.value })}
+                        className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/40"
+                        placeholder="Label (e.g. AI GTM Leader)"
+                      />
+
+                      <textarea
+                        value={pillar.goal}
+                        onChange={(e) => updatePillar(pi, { goal: e.target.value })}
+                        className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/40 resize-none"
+                        placeholder="Goal description"
+                        rows={2}
+                      />
+
+                      <textarea
+                        value={pillar.tagline}
+                        onChange={(e) => updatePillar(pi, { tagline: e.target.value })}
+                        className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/40 resize-none"
+                        placeholder="Describe the bridge between now and the target."
+                        rows={2}
+                      />
+
+                      <div>
+                        <label className="block text-xs text-gray-400 dark:text-slate-500 mb-1">Color</label>
+                        <div className="flex flex-wrap gap-2">
+                          {COLOR_OPTIONS.map(({ value, label }) => (
+                            <button
+                              key={value}
+                              onClick={() => updatePillar(pi, { color: value })}
+                              className={`px-2 py-1 text-xs rounded-lg border transition-all ${
+                                pillar.color === value
+                                  ? 'border-gray-900 dark:border-white bg-gray-100 dark:bg-slate-700 font-bold'
+                                  : 'border-gray-200 dark:border-slate-700 hover:border-gray-400'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                      <div className="space-y-1.5">
-                        {pillar.items.map((item, ii) => (
-                          <div key={ii} className="flex items-center gap-1.5">
-                            <span className={`text-[10px] font-bold uppercase w-6 text-center flex-shrink-0 ${
-                              item.type === 'metric' ? 'text-blue-400' : 'text-gray-400'
-                            }`}>
-                              {item.type === 'metric' ? '#' : '✓'}
-                            </span>
-                            <input
-                              type="text"
-                              value={item.label}
-                              onChange={(e) => updatePillarItem(pi, ii, { label: e.target.value })}
-                              className="flex-1 px-2 py-1 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/50"
-                              placeholder={item.type === 'metric' ? 'e.g. Prospects reached out to' : 'e.g. Review pipeline'}
-                            />
-                            {item.type === 'metric' && (
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-xl border border-gray-200 dark:border-slate-700 p-3">
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Metric type</label>
+                          <select
+                            value={pillar.metric_kind || 'count'}
+                            onChange={(e) => updatePillar(pi, { metric_kind: e.target.value as HomeVisionMetricKind })}
+                            className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/40"
+                          >
+                            {METRIC_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Current value</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={pillar.current_value ?? ''}
+                            onChange={(e) => updatePillar(pi, { current_value: parseOptionalNumber(e.target.value) })}
+                            className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/40"
+                            placeholder={pillar.metric_kind === 'time_seconds' ? '3449' : '0'}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Target value</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={pillar.target_value ?? ''}
+                            onChange={(e) => updatePillar(pi, { target_value: parseOptionalNumber(e.target.value) })}
+                            className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/40"
+                            placeholder={pillar.metric_kind === 'time_seconds' ? '3299' : '0'}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Current label</label>
+                          <input
+                            type="text"
+                            value={pillar.current_label || ''}
+                            onChange={(e) => updatePillar(pi, { current_label: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/40"
+                            placeholder="Now"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Target label</label>
+                          <input
+                            type="text"
+                            value={pillar.target_label || ''}
+                            onChange={(e) => updatePillar(pi, { target_label: e.target.value })}
+                            className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/40"
+                            placeholder="Target"
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-medium text-gray-500 dark:text-slate-400 mb-1">Target date</label>
+                          <input
+                            type="date"
+                            value={pillar.target_date || ''}
+                            onChange={(e) => updatePillar(pi, { target_date: e.target.value || null })}
+                            className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/40"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs text-gray-400 dark:text-slate-500">What it takes</label>
+                          <button
+                            onClick={() => addPillarItem(pi)}
+                            className="text-xs text-slate-600 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white font-medium flex items-center gap-0.5"
+                          >
+                            <Plus className="w-3 h-3" /> Add
+                          </button>
+                        </div>
+                        <div className="space-y-1.5">
+                          {items.map((item, ii) => (
+                            <div key={ii} className="flex items-center gap-1.5">
                               <input
-                                type="number"
-                                value={item.target ?? 5}
-                                onChange={(e) => updatePillarItem(pi, ii, { target: parseInt(e.target.value) || 1 })}
-                                className="w-14 px-2 py-1 text-sm text-center bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-lg text-blue-700 dark:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                min={1}
-                                title="Daily target"
+                                type="text"
+                                value={item.label}
+                                onChange={(e) => updatePillarItem(pi, ii, e.target.value)}
+                                className="flex-1 px-2 py-1.5 text-sm bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-500/40"
+                                placeholder="The bridge from now to the target..."
                               />
-                            )}
-                            <button onClick={() => removePillarItem(pi, ii)} className="p-1 text-red-400 hover:text-red-500 flex-shrink-0">
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ))}
+                              <button onClick={() => removePillarItem(pi, ii)} className="p-1 text-red-400 hover:text-red-500 flex-shrink-0">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
-
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
             {homeVision && (
               <button
                 onClick={() => {
-                  if (confirm('Delete your vision?')) deleteMutation.mutate()
+                  if (confirm('Delete your roadmap?')) deleteMutation.mutate()
                 }}
                 disabled={deleteMutation.isPending}
                 className="px-4 py-2.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg font-medium text-sm transition-colors"
@@ -504,7 +727,7 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
             <button
               onClick={handleSave}
               disabled={!editData.title.trim() || upsertMutation.isPending}
-              className="px-6 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-lg font-medium text-sm transition-colors"
+              className="px-6 py-2.5 bg-slate-600 hover:bg-slate-700 disabled:opacity-50 text-white rounded-lg font-medium text-sm transition-colors"
             >
               {upsertMutation.isPending ? 'Saving...' : 'Save'}
             </button>
@@ -514,255 +737,193 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
     )
   }
 
-  // Display mode
   if (!homeVision) return null
 
-  const rawPillars = Array.isArray(homeVision.pillars)
-    ? homeVision.pillars
-    : typeof homeVision.pillars === 'string'
-      ? JSON.parse(homeVision.pillars)
-      : []
-
-  const pillars: HomeVisionPillar[] = rawPillars.map((p: any) => ({
-    ...p,
-    items: normalizePillarItems(p.items || []),
-  }))
+  const pillars: NormalizedHomeVisionPillar[] = (
+    Array.isArray(homeVision.pillars)
+      ? homeVision.pillars
+      : typeof homeVision.pillars === 'string'
+        ? JSON.parse(homeVision.pillars)
+        : []
+  ).map((pillar: HomeVisionPillar) => normalizePillar(pillar, selectedDate))
 
   return (
     <div className="mb-10 space-y-4">
-      <div className="rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 p-[2px]">
-        <div className="rounded-2xl bg-white dark:bg-slate-900 p-5">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Flame className="w-5 h-5 text-orange-500" />
-              <h2 className="text-lg font-extrabold text-bevel-text dark:text-white tracking-tight uppercase">
-                {homeVision.title}
-              </h2>
+      <div className="rounded-[2rem] border border-slate-200/80 dark:border-slate-700 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.95),_rgba(241,245,249,0.9))] dark:bg-slate-900/95 shadow-[0_18px_60px_rgba(148,163,184,0.12)] overflow-hidden">
+        <div className="rounded-[2rem] p-5 md:p-7">
+          <div className="flex items-start justify-between gap-4 mb-5">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-800/90 flex items-center justify-center shadow-sm">
+                  <Flame className="w-5 h-5 text-slate-500" />
+                </div>
+                <h2 className="text-xl md:text-2xl font-heading font-medium text-bevel-text dark:text-white tracking-tight uppercase">
+                  {homeVision.title}
+                </h2>
+              </div>
+              {homeVision.subtitle && (
+                <p className="text-sm md:text-base text-bevel-text-secondary dark:text-slate-400 max-w-2xl">{homeVision.subtitle}</p>
+              )}
             </div>
             <button
               onClick={startEditing}
-              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              title="Edit vision"
+              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              title="Edit vision map"
             >
               <Pencil className="w-4 h-4" />
             </button>
           </div>
-          {homeVision.subtitle && (
-            <p className="text-xs text-bevel-text-secondary dark:text-slate-400 mb-4">{homeVision.subtitle}</p>
-          )}
+
           <div className="space-y-3">
             {pillars.map((pillar, index) => {
               const colors = PILLAR_COLORS[pillar.color] || PILLAR_COLORS.emerald
-              // Calculate pillar completion
-              const pillarItems = pillar.items
-              const completedCount = pillarItems.filter((_: PillarItem, ii: number) => {
-                const key = `hv-${index}-${ii}`
-                return logState[key]?.completed
-              }).length
-              const totalCount = pillarItems.length
+              const progressPercent = getProgressPercent(pillar)
+              const rateText = getRateToGoalText(pillar, selectedDate)
+              const actionItems = normalizePillarItems(pillar.items || [])
 
               return (
-                <div key={index} className={`rounded-xl border ${colors.border} overflow-hidden`}>
+                <div key={index} className={`rounded-[1.5rem] border ${colors.border} bg-gradient-to-br ${colors.tint} overflow-hidden`}>
                   <button
                     onClick={() => setExpandedGoal(expandedGoal === index ? null : index)}
-                    className={`w-full flex items-center gap-3 p-3 ${colors.hoverBg} transition-colors`}
+                    className={`w-full p-4 ${colors.hoverBg} transition-colors text-left`}
                   >
-                    <div className={`flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br ${colors.gradient} flex items-center justify-center text-white font-black text-sm shadow-lg`}>
-                      {index + 1}
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${colors.label} mb-0.5`}>
-                        {pillar.label}
-                      </p>
-                      <p className="font-extrabold text-bevel-text dark:text-white text-[15px] leading-snug">
-                        {pillar.goal}
-                      </p>
-                    </div>
-                    {totalCount > 0 && (
-                      <span className={`text-xs font-bold ${completedCount === totalCount ? colors.label : 'text-gray-400 dark:text-slate-500'} mr-1`}>
-                        {completedCount}/{totalCount}
-                      </span>
-                    )}
-                    <ChevronDown className={`w-4 h-4 text-bevel-text-secondary transition-transform ${expandedGoal === index ? 'rotate-180' : ''}`} />
-                  </button>
-                  {expandedGoal === index && (
-                    <div className="px-3 pb-3 pl-14 space-y-2">
-                      {pillar.tagline && (
-                        <p className={`text-sm font-semibold ${colors.tagline}`}>{pillar.tagline}</p>
-                      )}
-                      {pillar.items.map((item, ii) => {
-                        const key = `hv-${index}-${ii}`
-                        const state = logState[key]
+                    <div className="flex items-start gap-4">
+                      <div className={`flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center text-white font-semibold text-lg shadow-sm`}>
+                        {index + 1}
+                      </div>
 
-                        if (item.type === 'metric') {
-                          const target = item.target ?? 5
-                          const currentValue = state?.value ?? 0
-                          const isComplete = currentValue >= target
-
-                          return (
-                            <div key={key} className="flex items-center gap-2.5">
-                              <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                                isComplete ? colors.checked : `border-slate-300 dark:border-slate-600`
-                              }`}>
-                                {isComplete && <Check className="w-3 h-3 text-white" />}
-                              </div>
-                              <p className={`text-sm flex-1 ${
-                                isComplete ? 'text-bevel-text-secondary dark:text-slate-500' : 'text-bevel-text dark:text-slate-300'
-                              }`}>
-                                {item.label}
-                              </p>
-                              <div className="flex items-center gap-1.5">
-                                <input
-                                  type="number"
-                                  value={currentValue || ''}
-                                  onChange={(e) => {
-                                    const val = parseInt(e.target.value) || 0
-                                    handleMetricChange(index, ii, val, target)
-                                  }}
-                                  className={`w-12 px-1.5 py-0.5 text-sm text-center rounded-md border ${colors.metricBg} border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white focus:outline-none focus:ring-2 ${colors.metricRing}`}
-                                  min={0}
-                                  placeholder="0"
-                                />
-                                <span className="text-xs text-gray-400 dark:text-slate-500">/ {target}</span>
-                              </div>
-                            </div>
-                          )
-                        }
-
-                        // Checkbox item
-                        return (
-                          <button key={key} onClick={(e) => toggleMit(key, e)} className="w-full flex items-center gap-2.5 group">
-                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                              state?.completed ? colors.checked : `border-slate-300 dark:border-slate-600 ${colors.checkHover}`
-                            }`}>
-                              {state?.completed && <Check className="w-3 h-3 text-white" />}
-                            </div>
-                            <p className={`text-sm text-left ${
-                              state?.completed ? 'text-bevel-text-secondary dark:text-slate-500 line-through' : 'text-bevel-text dark:text-slate-300'
-                            }`}>
-                              {item.label}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-[11px] font-semibold uppercase tracking-[0.28em] ${colors.label} mb-1.5`}>
+                              {pillar.label}
                             </p>
-                          </button>
-                        )
-                      })}
+                            <p className="font-medium text-bevel-text dark:text-white text-lg md:text-[1.35rem] leading-tight max-w-3xl">
+                              {pillar.goal}
+                            </p>
+                          </div>
+                          <ChevronDown className={`w-5 h-5 text-bevel-text-secondary mt-1 flex-shrink-0 transition-transform ${expandedGoal === index ? 'rotate-180' : ''}`} />
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                          <span className={`rounded-full px-2.5 py-1 ${colors.soft}`}>
+                            {pillar.current_label || 'Now'}: {formatMetricValue(pillar.current_value, pillar.metric_kind)}
+                          </span>
+                          <span className="text-slate-300 dark:text-slate-600">{'->'}</span>
+                          <span className="rounded-full px-2.5 py-1 bg-white/80 dark:bg-slate-900/60">
+                            Gap: {formatGapValue(pillar)}
+                          </span>
+                          <span className="text-slate-300 dark:text-slate-600">{'->'}</span>
+                          <span className={`rounded-full px-2.5 py-1 ${colors.soft}`}>
+                            {pillar.target_label || 'Target'}: {formatMetricValue(pillar.target_value, pillar.metric_kind)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+
+                  {expandedGoal === index && (
+                    <div className="px-4 pb-4">
+                      <div className="ml-0 md:ml-[3.75rem] space-y-3 border-t border-white/70 dark:border-slate-800 pt-3">
+                        {pillar.tagline && (
+                          <p className={`text-sm leading-relaxed ${colors.accentText}`}>{pillar.tagline}</p>
+                        )}
+
+                        <div className="rounded-[1.4rem] border border-white/80 dark:border-slate-700 bg-white/65 dark:bg-slate-900/45 p-3 md:p-4">
+                          <div className="grid grid-cols-3 gap-3 items-start">
+                            <div className="relative">
+                              <div className={`w-3.5 h-3.5 rounded-full bg-gradient-to-br ${colors.gradient} shadow-sm`} />
+                              <div className="mt-2 space-y-0.5">
+                                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
+                                  {pillar.current_label || 'Now'}
+                                </p>
+                                <p className="text-base font-semibold text-bevel-text dark:text-white">
+                                  {formatMetricValue(pillar.current_value, pillar.metric_kind)}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="relative pt-1">
+                              <div className="h-px border-t-2 border-dashed border-slate-300 dark:border-slate-600" />
+                              {progressPercent !== null && (
+                                <div className="absolute left-0 right-0 -top-1">
+                                  <div
+                                    className={`h-2 rounded-full bg-gradient-to-r ${colors.progress} opacity-80`}
+                                    style={{ width: `${progressPercent}%` }}
+                                  />
+                                </div>
+                              )}
+                              <div className="mt-5 text-center">
+                                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Gap</p>
+                                <p className="text-sm font-medium text-bevel-text dark:text-white">{formatGapValue(pillar)}</p>
+                                {progressPercent !== null && (
+                                  <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{Math.round(progressPercent)}% there</p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="relative text-right">
+                              <div className={`ml-auto w-3.5 h-3.5 rounded-full bg-gradient-to-br ${colors.gradient} shadow-sm`} />
+                              <div className="mt-2 space-y-0.5">
+                                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
+                                  {pillar.target_label || 'Target'}
+                                </p>
+                                <p className="text-base font-semibold text-bevel-text dark:text-white">
+                                  {formatMetricValue(pillar.target_value, pillar.metric_kind)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {(rateText || pillar.target_date) && (
+                            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                              {rateText && (
+                                <div className="flex items-center gap-1.5">
+                                  <CalendarClock className="w-3.5 h-3.5" />
+                                  <span>{rateText}</span>
+                                </div>
+                              )}
+                              {pillar.target_date && (
+                                <span>Target date: {formatCompactDate(pillar.target_date)}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-[1.35rem] border border-slate-200/70 dark:border-slate-700 bg-white/55 dark:bg-slate-900/35 p-3">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Target className="w-4 h-4 text-slate-400" />
+                            <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">What It Takes</p>
+                          </div>
+                          <div className="space-y-1.5">
+                            {actionItems.map((item, ii) => {
+                              const key = `hv-${index}-${ii}`
+                              return (
+                                <button key={key} onClick={(e) => toggleMit(key, e)} className="w-full flex items-start gap-2.5 group text-left">
+                                  <div className={`w-4.5 h-4.5 mt-0.5 rounded-full border flex items-center justify-center flex-shrink-0 transition-all ${
+                                    mitChecked[key] ? colors.checked : `border-slate-300 dark:border-slate-600 ${colors.checkHover}`
+                                  }`}>
+                                    {mitChecked[key] && <Check className="w-2.5 h-2.5 text-white" />}
+                                  </div>
+                                  <p className={`text-sm leading-relaxed ${
+                                    mitChecked[key] ? 'text-bevel-text-secondary dark:text-slate-500 line-through' : 'text-bevel-text dark:text-slate-300'
+                                  }`}>
+                                    {item.label}
+                                  </p>
+                                </button>
+                              )
+                            })}
+                            {actionItems.length === 0 && (
+                              <p className="text-sm text-slate-400 dark:text-slate-500">Add the concrete actions that bridge this gap.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
               )
             })}
-
-          </div>
-
-          {/* Progress dropdown */}
-          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-800">
-            <button
-              onClick={() => setShowProgress(!showProgress)}
-              className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 transition-colors"
-            >
-              <BarChart3 className="w-4 h-4" />
-              {showProgress ? 'Hide Progress' : 'View Progress'}
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showProgress ? 'rotate-180' : ''}`} />
-            </button>
-
-            {showProgress && (
-              <div className="mt-3 space-y-4">
-                {/* Range toggle */}
-                <div className="flex justify-center gap-1 p-1 bg-gray-100 dark:bg-slate-800 rounded-lg">
-                  {(['week', 'month', 'year'] as const).map((range) => (
-                    <button
-                      key={range}
-                      onClick={() => setProgressRange(range)}
-                      className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                        progressRange === range
-                          ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-white shadow-sm'
-                          : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300'
-                      }`}
-                    >
-                      {range === 'week' ? '7 Days' : range === 'month' ? '30 Days' : 'Year'}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Overall score */}
-                {(() => {
-                  const totalDays = progressRange === 'week' ? 7 : progressRange === 'month' ? 30 : Math.ceil((new Date(dateKey).getTime() - new Date(new Date(dateKey).getFullYear(), 0, 1).getTime()) / 86400000) + 1
-                  const daysWithAnyLog = new Set(progressLogs.filter((l: VisionChecklistLog) => l.completed).map((l: VisionChecklistLog) => l.date)).size
-                  const overallPct = totalDays > 0 ? Math.round((daysWithAnyLog / totalDays) * 100) : 0
-
-                  return (
-                    <div className="text-center py-2">
-                      <p className="text-3xl font-black text-gray-900 dark:text-white">{overallPct}%</p>
-                      <p className="text-xs text-gray-500 dark:text-slate-400">days active ({daysWithAnyLog}/{totalDays} days)</p>
-                    </div>
-                  )
-                })()}
-
-                {/* Per-pillar stats */}
-                {pillars.map((pillar, pi) => {
-                  const colors = PILLAR_COLORS[pillar.color] || PILLAR_COLORS.emerald
-                  const pillarLogs = progressLogs.filter((l: VisionChecklistLog) => l.pillar_index === pi)
-
-                  return (
-                    <div key={pi} className={`rounded-xl border ${colors.border} p-3 space-y-2`}>
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${colors.label}`}>
-                        {pillar.label}
-                      </p>
-                      {pillar.items.map((item, ii) => {
-                        const itemLogs = pillarLogs.filter((l: VisionChecklistLog) => l.item_index === ii)
-                        const completedLogs = itemLogs.filter((l: VisionChecklistLog) => l.completed)
-
-                        if (item.type === 'metric') {
-                          const totalValue = itemLogs.reduce((sum: number, l: VisionChecklistLog) => sum + (l.value ?? 0), 0)
-                          const daysLogged = itemLogs.filter((l: VisionChecklistLog) => (l.value ?? 0) > 0).length
-                          const avg = daysLogged > 0 ? (totalValue / daysLogged).toFixed(1) : '0'
-                          const target = item.target ?? 1
-                          const daysHitTarget = completedLogs.length
-
-                          return (
-                            <div key={ii} className="flex items-center justify-between">
-                              <p className="text-sm text-bevel-text dark:text-slate-300 flex-1">{item.label}</p>
-                              <div className="flex items-center gap-3 text-xs">
-                                <span className="text-gray-500 dark:text-slate-400">
-                                  <span className="font-bold text-gray-900 dark:text-white">{totalValue}</span> total
-                                </span>
-                                <span className="text-gray-500 dark:text-slate-400">
-                                  <span className="font-bold text-gray-900 dark:text-white">{avg}</span>/day avg
-                                </span>
-                                <span className={`font-bold ${daysHitTarget > 0 ? colors.label : 'text-gray-400 dark:text-slate-500'}`}>
-                                  {daysHitTarget}d hit
-                                </span>
-                              </div>
-                            </div>
-                          )
-                        }
-
-                        // Checkbox stats
-                        const daysCompleted = completedLogs.length
-                        const totalDays = progressRange === 'week' ? 7 : progressRange === 'month' ? 30 : Math.ceil((new Date(dateKey).getTime() - new Date(new Date(dateKey).getFullYear(), 0, 1).getTime()) / 86400000) + 1
-                        const pct = totalDays > 0 ? Math.round((daysCompleted / totalDays) * 100) : 0
-
-                        return (
-                          <div key={ii} className="flex items-center justify-between">
-                            <p className="text-sm text-bevel-text dark:text-slate-300 flex-1">{item.label}</p>
-                            <div className="flex items-center gap-2 text-xs">
-                              <div className="w-16 h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full bg-gradient-to-r ${colors.gradient}`}
-                                  style={{ width: `${pct}%` }}
-                                />
-                              </div>
-                              <span className={`font-bold ${pct > 70 ? colors.label : 'text-gray-400 dark:text-slate-500'}`}>
-                                {daysCompleted}d
-                              </span>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
           </div>
         </div>
       </div>
