@@ -52,70 +52,68 @@ export function SortableHabitCard({ habit, onEdit, onToggle }: SortableHabitCard
     <div
       ref={setNodeRef}
       style={style}
-      className={`bg-bevel-card dark:bg-slate-800 rounded-2xl p-4 transition-all duration-200 ${
+      className={`relative rounded-[1rem] px-2 py-2 transition-all duration-200 ${
         isDragging
-          ? 'opacity-50 shadow-bevel-lg scale-[1.02]'
+          ? 'opacity-50 scale-[1.01] bg-white/60 dark:bg-slate-800/60'
           : habit.completed
-            ? 'shadow-bevel ring-2 ring-teal/20'
+            ? 'bg-white/45 dark:bg-slate-800/35'
             : 'shadow-bevel hover:shadow-bevel-md'
       }`}
     >
+      <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-[#e7dfd1]/50 dark:bg-slate-700/35" />
       <div className="flex items-start gap-3">
-        {/* Drag Handle */}
         <button
           {...attributes}
           {...listeners}
-          className="touch-none p-1 mt-0.5 text-bevel-text-secondary dark:text-slate-400 hover:text-bevel-text dark:hover:text-slate-200 cursor-grab active:cursor-grabbing"
+          className="touch-none p-1 mt-0.5 text-bevel-text-secondary/80 dark:text-slate-500 hover:text-bevel-text dark:hover:text-slate-200 cursor-grab active:cursor-grabbing"
           onClick={(e) => e.stopPropagation()}
         >
-          <GripVertical className="w-5 h-5" />
+          <GripVertical className="w-4 h-4" />
         </button>
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <h3 className={`font-semibold leading-snug ${
+          <div className="flex items-start justify-between gap-2 mb-1.5">
+            <h3 className={`font-medium leading-snug text-[15px] ${
               habit.completed
                 ? 'text-teal dark:text-teal-400'
                 : 'text-bevel-text dark:text-white'
             }`}>
-              Will I {habit.name.toLowerCase()} today?
+              {habit.name}
             </h3>
             <button
               onClick={handleOptionsClick}
-              className="p-1.5 -m-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-xl transition-colors flex-shrink-0"
+              className="p-1 -m-0.5 hover:bg-gray-100/70 dark:hover:bg-slate-700/70 rounded-lg transition-colors flex-shrink-0"
               aria-label="Habit options"
             >
-              <MoreHorizontal className="w-4 h-4 text-bevel-text-secondary dark:text-slate-400" />
+              <MoreHorizontal className="w-3.5 h-3.5 text-bevel-text-secondary dark:text-slate-400" />
             </button>
           </div>
 
           {habit.description && (
-            <p className="text-sm text-bevel-text-secondary dark:text-slate-400 mb-3">{habit.description}</p>
+            <p className="text-[13px] text-bevel-text-secondary dark:text-slate-400 mb-2.5 leading-relaxed">{habit.description}</p>
           )}
 
-          {/* Yes / No buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <button
               onClick={handleYes}
-              className={`flex-1 py-2 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 rounded-full font-medium text-sm transition-all duration-200 flex items-center justify-center gap-1.5 ${
                 habit.completed
-                  ? 'bg-teal text-white shadow-md scale-[1.02]'
-                  : 'bg-teal/10 text-teal hover:bg-teal/20 active:scale-[0.98]'
+                  ? 'bg-teal text-white shadow-sm'
+                  : 'bg-white/55 dark:bg-slate-800/55 text-teal hover:bg-teal/10 active:scale-[0.98]'
               }`}
             >
-              <Check className="w-4 h-4" />
+              <Check className="w-3.5 h-3.5" />
               Yes
             </button>
             <button
               onClick={handleNo}
-              className={`flex-1 py-2 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 rounded-full font-medium text-sm transition-all duration-200 flex items-center justify-center gap-1.5 ${
                 habit.completed === false && habit.missNote
-                  ? 'bg-red-500 text-white shadow-md scale-[1.02]'
-                  : 'bg-gray-100 dark:bg-slate-700 text-bevel-text-secondary dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600 active:scale-[0.98]'
+                  ? 'bg-red-500 text-white shadow-sm'
+                  : 'bg-white/55 dark:bg-slate-800/55 text-bevel-text-secondary dark:text-slate-400 hover:bg-gray-100/70 dark:hover:bg-slate-700 active:scale-[0.98]'
               }`}
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
               No
             </button>
           </div>

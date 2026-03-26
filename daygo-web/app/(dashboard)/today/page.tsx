@@ -488,10 +488,19 @@ export default function TodayPage() {
   const yesterday = new Date(selectedDate)
   yesterday.setDate(yesterday.getDate() - 1)
   const yesterdayStr = formatDate(yesterday)
+  const habitScoreStart = new Date(selectedDate)
+  habitScoreStart.setDate(habitScoreStart.getDate() - 6)
+  const habitScoreStartStr = formatDate(habitScoreStart)
 
   const { data: habits = [], isLoading: habitsLoading } = useQuery({
     queryKey: ['habits', user?.id, dateStr],
     queryFn: () => habitsService.getHabitsWithLogs(user!.id, dateStr),
+    enabled: !!user,
+  })
+
+  const { data: habitScoreHistory = [] } = useQuery({
+    queryKey: ['habit-score-history', user?.id, habitScoreStartStr, dateStr],
+    queryFn: () => habitsService.getScoreHistory(user!.id, habitScoreStartStr, dateStr),
     enabled: !!user,
   })
 
@@ -2888,27 +2897,94 @@ export default function TodayPage() {
                 )}
               </button>
               {expandedSections.habits && (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleHabitDragEnd}
-                >
-                  <SortableContext
-                    items={habits.map((h) => h.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="space-y-3">
-                      {habits.map((habit) => (
-                        <SortableHabitCard
-                          key={habit.id}
-                          habit={habit}
-                          onEdit={(h) => setSelectedHabit(h)}
-                          onToggle={(habitId, completed) => toggleHabitMutation.mutate({ habitId, completed })}
-                        />
-                      ))}
+                <>
+                  <div className="rounded-[1.25rem] bg-[linear-gradient(180deg,rgba(255,253,248,0.72),rgba(248,244,235,0.42))] px-2 py-2">
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleHabitDragEnd}
+                    >
+                      <SortableContext
+                        items={habits.map((h) => h.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-1.5">
+                          {habits.map((habit) => (
+                            <SortableHabitCard
+                              key={habit.id}
+                              habit={habit}
+                              onEdit={(h) => setSelectedHabit(h)}
+                              onToggle={(habitId, completed) => toggleHabitMutation.mutate({ habitId, completed })}
+                            />
+                          ))}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  </div>
+
+                  <div className="mt-4 rounded-[1.15rem] bg-white/45 dark:bg-slate-900/20 px-3 py-3">
+                    <div className="flex items-end justify-between gap-4 mb-3">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500">Daily Habit Score</p>
+                        <p className="text-2xl font-semibold text-bevel-text dark:text-white">
+                          {habits.length > 0 ? Math.round((habits.filter(h => h.completed).length / habits.length) * 100) : 0}%
+                        </p>
+                        <p className="text-[13px] text-bevel-text-secondary dark:text-slate-400">
+                          {habits.filter(h => h.completed).length} of {habits.length} habits checked today
+                        </p>
+                      </div>
+                      <div className="text-right text-[12px] text-slate-400 dark:text-slate-500">
+                        <p>Last 7 days</p>
+                      </div>
                     </div>
-                  </SortableContext>
-                </DndContext>
+
+                    <div className="h-28">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={habitScoreHistory.map((entry) => ({
+                            ...entry,
+                            label: new Date(`${entry.date}T00:00:00`).toLocaleDateString('en-US', { weekday: 'narrow' }),
+                          }))}
+                          margin={{ top: 4, right: 6, left: -18, bottom: 0 }}
+                        >
+                          <CartesianGrid vertical={false} stroke="#e7dfd1" strokeDasharray="2 4" />
+                          <XAxis
+                            dataKey="label"
+                            tickLine={false}
+                            axisLine={false}
+                            tick={{ fontSize: 11, fill: '#8a7f6d' }}
+                          />
+                          <YAxis
+                            tickLine={false}
+                            axisLine={false}
+                            width={26}
+                            domain={[0, 100]}
+                            tick={{ fontSize: 10, fill: '#b0a391' }}
+                          />
+                          <Tooltip
+                            formatter={(value) => [`${value}%`, 'Habit score']}
+                            labelFormatter={(_, payload) => payload?.[0]?.payload?.date || ''}
+                            contentStyle={{
+                              backgroundColor: 'rgba(255,253,248,0.96)',
+                              border: '1px solid #e6dccb',
+                              borderRadius: '12px',
+                              fontSize: '12px',
+                              color: '#3f3a31',
+                            }}
+                          />
+                          <Bar dataKey="score" radius={[8, 8, 4, 4]} maxBarSize={26}>
+                            {habitScoreHistory.map((entry, index) => (
+                              <Cell
+                                key={`${entry.date}-${index}`}
+                                fill={entry.date === dateStr ? '#64748b' : '#cbbda6'}
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </>
               )}
             </section>
           )}
