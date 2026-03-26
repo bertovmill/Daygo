@@ -2330,6 +2330,7 @@ export default function TodayPage() {
         selectedDate={selectedDate}
         scheduleEvents={scheduleEvents}
         googleCalendarEvents={googleCalendarEvents as Array<{ id: string; title: string; description?: string | null; start_time: string; end_time: string; is_all_day?: boolean }>}
+        wakeTime={userPreferences?.wake_time ? userPreferencesService.formatTimeForDisplay(userPreferences.wake_time) : '07:00'}
       />
 
       {/* Daily Reflection - bertmill19 */}

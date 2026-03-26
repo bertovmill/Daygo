@@ -748,26 +748,24 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
   ).map((pillar: HomeVisionPillar) => normalizePillar(pillar, selectedDate))
 
   return (
-    <div className="mb-10 space-y-4">
-      <div className="rounded-[2rem] border border-slate-200/80 dark:border-slate-700 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.95),_rgba(241,245,249,0.9))] dark:bg-slate-900/95 shadow-[0_18px_60px_rgba(148,163,184,0.12)] overflow-hidden">
-        <div className="rounded-[2rem] p-5 md:p-7">
-          <div className="flex items-start justify-between gap-4 mb-5">
-            <div className="space-y-2">
+    <div className="mb-8 space-y-3">
+      <div className="bg-[linear-gradient(180deg,rgba(255,255,255,0.65),rgba(248,250,252,0.35))]">
+        <div className="px-1 py-1">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="space-y-1.5">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-800/90 flex items-center justify-center shadow-sm">
-                  <Flame className="w-5 h-5 text-slate-500" />
-                </div>
-                <h2 className="text-xl md:text-2xl font-heading font-medium text-bevel-text dark:text-white tracking-tight uppercase">
+                <Flame className="w-4 h-4 text-slate-400" />
+                <h2 className="text-base md:text-[1.45rem] font-heading font-medium text-bevel-text dark:text-white tracking-tight uppercase">
                   {homeVision.title}
                 </h2>
               </div>
               {homeVision.subtitle && (
-                <p className="text-sm md:text-base text-bevel-text-secondary dark:text-slate-400 max-w-2xl">{homeVision.subtitle}</p>
+                <p className="text-[13px] text-bevel-text-secondary dark:text-slate-400 max-w-xl">{homeVision.subtitle}</p>
               )}
             </div>
             <button
               onClick={startEditing}
-              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-white/70 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-white/40 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
               title="Edit vision map"
             >
               <Pencil className="w-4 h-4" />
@@ -780,122 +778,188 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
               const progressPercent = getProgressPercent(pillar)
               const rateText = getRateToGoalText(pillar, selectedDate)
               const actionItems = normalizePillarItems(pillar.items || [])
+              const gradientId = `visionProgress-${index}`
 
               return (
-                <div key={index} className={`rounded-[1.5rem] border ${colors.border} bg-gradient-to-br ${colors.tint} overflow-hidden`}>
+                <div key={index} className={`rounded-[1.15rem] bg-gradient-to-br ${colors.tint} overflow-hidden`}>
                   <button
                     onClick={() => setExpandedGoal(expandedGoal === index ? null : index)}
-                    className={`w-full p-4 ${colors.hoverBg} transition-colors text-left`}
+                    className={`w-full p-3 ${colors.hoverBg} transition-colors text-left`}
                   >
-                    <div className="flex items-start gap-4">
-                      <div className={`flex-shrink-0 w-11 h-11 rounded-2xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center text-white font-semibold text-lg shadow-sm`}>
+                    <div className="flex items-start gap-3">
+                      <div className={`flex-shrink-0 w-8 h-8 rounded-[0.95rem] bg-gradient-to-br ${colors.gradient} flex items-center justify-center text-white font-semibold text-sm shadow-sm`}>
                         {index + 1}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className={`text-[11px] font-semibold uppercase tracking-[0.28em] ${colors.label} mb-1.5`}>
+                            <p className={`text-[9px] font-semibold uppercase tracking-[0.24em] ${colors.label} mb-0.5`}>
                               {pillar.label}
                             </p>
-                            <p className="font-medium text-bevel-text dark:text-white text-lg md:text-[1.35rem] leading-tight max-w-3xl">
+                            <p className="font-medium text-bevel-text dark:text-white text-[15px] md:text-[1.05rem] leading-tight max-w-3xl">
                               {pillar.goal}
                             </p>
                           </div>
-                          <ChevronDown className={`w-5 h-5 text-bevel-text-secondary mt-1 flex-shrink-0 transition-transform ${expandedGoal === index ? 'rotate-180' : ''}`} />
+                          <ChevronDown className={`w-4.5 h-4.5 text-bevel-text-secondary mt-0.5 flex-shrink-0 transition-transform ${expandedGoal === index ? 'rotate-180' : ''}`} />
                         </div>
 
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                          <span className={`rounded-full px-2.5 py-1 ${colors.soft}`}>
-                            {pillar.current_label || 'Now'}: {formatMetricValue(pillar.current_value, pillar.metric_kind)}
-                          </span>
-                          <span className="text-slate-300 dark:text-slate-600">{'->'}</span>
-                          <span className="rounded-full px-2.5 py-1 bg-white/80 dark:bg-slate-900/60">
-                            Gap: {formatGapValue(pillar)}
-                          </span>
-                          <span className="text-slate-300 dark:text-slate-600">{'->'}</span>
-                          <span className={`rounded-full px-2.5 py-1 ${colors.soft}`}>
-                            {pillar.target_label || 'Target'}: {formatMetricValue(pillar.target_value, pillar.metric_kind)}
-                          </span>
+                        <div className="mt-2.5 rounded-[1rem] bg-white/45 dark:bg-slate-900/20 px-2.5 py-2">
+                          <div className="grid grid-cols-[auto_1fr_auto] gap-2 items-center">
+                            <div>
+                              <p className="text-[9px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
+                                {pillar.current_label || 'Now'}
+                              </p>
+                              <p className="text-[13px] font-semibold text-bevel-text dark:text-white">
+                                {formatMetricValue(pillar.current_value, pillar.metric_kind)}
+                              </p>
+                            </div>
+
+                            <div className="px-1">
+                              <div className="relative h-6 flex items-center">
+                                <div className="absolute left-0 right-0 border-t-2 border-dashed border-slate-300 dark:border-slate-600" />
+                                <div className={`absolute left-0 w-3 h-3 rounded-full bg-gradient-to-br ${colors.gradient} shadow-sm`} />
+                                <div className={`absolute right-0 w-3 h-3 rounded-full bg-gradient-to-br ${colors.gradient} shadow-sm`} />
+                                {progressPercent !== null && (
+                                  <>
+                                    <div
+                                      className={`absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-gradient-to-r ${colors.progress} opacity-85`}
+                                      style={{ width: `calc(${progressPercent}% - 0.75rem)` }}
+                                    />
+                                    <div
+                                      className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border-2 border-white dark:border-slate-900 bg-white/90 dark:bg-slate-800 shadow-sm"
+                                      style={{ left: `calc(${progressPercent}% - 0.5rem)` }}
+                                    />
+                                  </>
+                                )}
+                              </div>
+                              <div className="mt-1 text-center">
+                                <p className="text-[9px] font-medium text-slate-500 dark:text-slate-400">
+                                  {formatGapValue(pillar)}
+                                  {progressPercent !== null ? ` • ${Math.round(progressPercent)}% there` : ''}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              <p className="text-[9px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
+                                {pillar.target_label || 'Target'}
+                              </p>
+                              <p className="text-[13px] font-semibold text-bevel-text dark:text-white">
+                                {formatMetricValue(pillar.target_value, pillar.metric_kind)}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </button>
 
                   {expandedGoal === index && (
-                    <div className="px-4 pb-4">
-                      <div className="ml-0 md:ml-[3.75rem] space-y-3 border-t border-white/70 dark:border-slate-800 pt-3">
-                        {pillar.tagline && (
-                          <p className={`text-sm leading-relaxed ${colors.accentText}`}>{pillar.tagline}</p>
-                        )}
-
-                        <div className="rounded-[1.4rem] border border-white/80 dark:border-slate-700 bg-white/65 dark:bg-slate-900/45 p-3 md:p-4">
-                          <div className="grid grid-cols-3 gap-3 items-start">
-                            <div className="relative">
-                              <div className={`w-3.5 h-3.5 rounded-full bg-gradient-to-br ${colors.gradient} shadow-sm`} />
-                              <div className="mt-2 space-y-0.5">
-                                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
-                                  {pillar.current_label || 'Now'}
-                                </p>
-                                <p className="text-base font-semibold text-bevel-text dark:text-white">
-                                  {formatMetricValue(pillar.current_value, pillar.metric_kind)}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="relative pt-1">
-                              <div className="h-px border-t-2 border-dashed border-slate-300 dark:border-slate-600" />
-                              {progressPercent !== null && (
-                                <div className="absolute left-0 right-0 -top-1">
-                                  <div
-                                    className={`h-2 rounded-full bg-gradient-to-r ${colors.progress} opacity-80`}
-                                    style={{ width: `${progressPercent}%` }}
-                                  />
+                    <div className="px-3 pb-3">
+                      <div className="ml-0 md:ml-[3.25rem] border-t border-white/70 dark:border-slate-800 pt-3">
+                        <div className="grid gap-3 md:grid-cols-[minmax(0,1.15fr)_minmax(260px,0.85fr)]">
+                          <div className="rounded-[1.05rem] bg-white/45 dark:bg-slate-900/20 p-3 overflow-hidden">
+                            <div className="flex items-start justify-between gap-3 mb-3">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1.5">
+                                  <TrendingUp className="w-4 h-4 text-slate-400" />
+                                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Vision Path</p>
                                 </div>
-                              )}
-                              <div className="mt-5 text-center">
-                                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Gap</p>
-                                <p className="text-sm font-medium text-bevel-text dark:text-white">{formatGapValue(pillar)}</p>
-                                {progressPercent !== null && (
-                                  <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{Math.round(progressPercent)}% there</p>
+                                {pillar.tagline && (
+                                  <p className={`text-[13px] leading-relaxed ${colors.accentText}`}>{pillar.tagline}</p>
                                 )}
                               </div>
+                              {pillar.target_date && (
+                                <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-medium ${colors.soft} ${colors.accentText}`}>
+                                  {formatCompactDate(pillar.target_date)}
+                                </span>
+                              )}
                             </div>
 
-                            <div className="relative text-right">
-                              <div className={`ml-auto w-3.5 h-3.5 rounded-full bg-gradient-to-br ${colors.gradient} shadow-sm`} />
-                              <div className="mt-2 space-y-0.5">
-                                <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">
-                                  {pillar.target_label || 'Target'}
-                                </p>
-                                <p className="text-base font-semibold text-bevel-text dark:text-white">
-                                  {formatMetricValue(pillar.target_value, pillar.metric_kind)}
-                                </p>
+                            <div className="rounded-[0.95rem] bg-white/55 dark:bg-slate-950/25 px-2.5 py-2.5">
+                              <div className="relative mb-3">
+                                <svg viewBox="0 0 320 88" className="w-full h-[88px]" aria-hidden="true">
+                                  <path
+                                    d="M18 62 C 70 62, 88 26, 146 26 S 248 62, 302 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    className="text-slate-300 dark:text-slate-700"
+                                    strokeWidth="2"
+                                    strokeDasharray="5 5"
+                                    strokeLinecap="round"
+                                  />
+                                  {progressPercent !== null && (
+                                    <path
+                                      d="M18 62 C 70 62, 88 26, 146 26 S 248 62, 302 24"
+                                      fill="none"
+                                      stroke={`url(#${gradientId})`}
+                                      strokeWidth="4"
+                                      strokeLinecap="round"
+                                      pathLength="100"
+                                      strokeDasharray={`${progressPercent} 100`}
+                                    />
+                                  )}
+                                  <circle cx="18" cy="62" r="8" className="fill-slate-500" />
+                                  <circle cx="302" cy="24" r="8" className="fill-slate-500" />
+                                  {progressPercent !== null && (
+                                    <circle
+                                      cx={18 + ((302 - 18) * progressPercent) / 100}
+                                      cy={62 + ((24 - 62) * progressPercent) / 100}
+                                      r="7"
+                                      className="fill-white dark:fill-slate-900 stroke-slate-500"
+                                      strokeWidth="3"
+                                    />
+                                  )}
+                                  <defs>
+                                    <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+                                      <stop offset="0%" stopColor="rgb(100 116 139)" />
+                                      <stop offset="100%" stopColor="rgb(51 65 85)" />
+                                    </linearGradient>
+                                  </defs>
+                                </svg>
+                              </div>
+
+                              <div className="grid grid-cols-3 gap-3 text-center">
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">{pillar.current_label || 'Now'}</p>
+                                  <p className="mt-1 text-[14px] font-semibold text-bevel-text dark:text-white">{formatMetricValue(pillar.current_value, pillar.metric_kind)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">Gap</p>
+                                  <p className="mt-1 text-[13px] font-medium text-bevel-text dark:text-white">{formatGapValue(pillar)}</p>
+                                  {progressPercent !== null && (
+                                    <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">{Math.round(progressPercent)}% there</p>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">{pillar.target_label || 'Target'}</p>
+                                  <p className="mt-1 text-[14px] font-semibold text-bevel-text dark:text-white">{formatMetricValue(pillar.target_value, pillar.metric_kind)}</p>
+                                </div>
                               </div>
                             </div>
+
+                            {(rateText || pillar.target_date) && (
+                              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                                {rateText && (
+                                  <div className="flex items-center gap-1.5">
+                                    <CalendarClock className="w-3.5 h-3.5" />
+                                    <span>{rateText}</span>
+                                  </div>
+                                )}
+                                {pillar.target_date && (
+                                  <span>Target date: {formatCompactDate(pillar.target_date)}</span>
+                                )}
+                              </div>
+                            )}
                           </div>
 
-                          {(rateText || pillar.target_date) && (
-                            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                              {rateText && (
-                                <div className="flex items-center gap-1.5">
-                                  <CalendarClock className="w-3.5 h-3.5" />
-                                  <span>{rateText}</span>
-                                </div>
-                              )}
-                              {pillar.target_date && (
-                                <span>Target date: {formatCompactDate(pillar.target_date)}</span>
-                              )}
+                          <div className="rounded-[1.05rem] bg-white/45 dark:bg-slate-900/18 p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Target className="w-4 h-4 text-slate-400" />
+                              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">What It Takes</p>
                             </div>
-                          )}
-                        </div>
-
-                        <div className="rounded-[1.35rem] border border-slate-200/70 dark:border-slate-700 bg-white/55 dark:bg-slate-900/35 p-3">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Target className="w-4 h-4 text-slate-400" />
-                            <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400 dark:text-slate-500">What It Takes</p>
-                          </div>
-                          <div className="space-y-1.5">
+                            <div className="space-y-1.5">
                             {actionItems.map((item, ii) => {
                               const key = `hv-${index}-${ii}`
                               return (
@@ -905,7 +969,7 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
                                   }`}>
                                     {mitChecked[key] && <Check className="w-2.5 h-2.5 text-white" />}
                                   </div>
-                                  <p className={`text-sm leading-relaxed ${
+                                  <p className={`text-[13px] leading-relaxed ${
                                     mitChecked[key] ? 'text-bevel-text-secondary dark:text-slate-500 line-through' : 'text-bevel-text dark:text-slate-300'
                                   }`}>
                                     {item.label}
@@ -916,6 +980,14 @@ export function HomeVisionSection({ userId, selectedDate }: HomeVisionSectionPro
                             {actionItems.length === 0 && (
                               <p className="text-sm text-slate-400 dark:text-slate-500">Add the concrete actions that bridge this gap.</p>
                             )}
+                            {actionItems.length > 0 && (
+                              <div className="pt-2">
+                                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                                  {actionItems.filter((_, ii) => mitChecked[`hv-${index}-${ii}`]).length} of {actionItems.length} actions checked today
+                                </p>
+                              </div>
+                            )}
+                            </div>
                           </div>
                         </div>
                       </div>

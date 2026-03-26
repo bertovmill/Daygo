@@ -62,11 +62,7 @@ function parseTimeToMinutes(time: string | undefined, fallbackHour: number) {
 }
 
 function getSlotStart(selectedDate: Date, wakeTime?: string) {
-  const now = new Date()
   const wakeMinutes = parseTimeToMinutes(wakeTime, DEFAULT_START_HOUR)
-  if (isSameCalendarDay(selectedDate, now)) {
-    return Math.min(Math.max(roundUpToNextHalfHour(now), wakeMinutes), END_HOUR * 60)
-  }
   return wakeMinutes
 }
 
@@ -134,17 +130,18 @@ export function DailyPlanningScratchpad({
   const storageKey = `daygo-scratchpad-blocks-${dateKey}`
   const [blocks, setBlocks] = useState<ScratchpadBlock[]>([])
   const [resizingBlockId, setResizingBlockId] = useState<string | null>(null)
+  const [currentTimeMinutes, setCurrentTimeMinutes] = useState<number | null>(null)
   const resizeAreaRef = useRef<HTMLDivElement | null>(null)
+  const slotStart = useMemo(() => getSlotStart(selectedDate, wakeTime), [selectedDate, wakeTime])
 
   const slots = useMemo(() => {
-    const start = getSlotStart(selectedDate, wakeTime)
     const end = END_HOUR * 60
     const values: number[] = []
-    for (let current = start; current <= end; current += SLOT_MINUTES) {
+    for (let current = slotStart; current <= end; current += SLOT_MINUTES) {
       values.push(current)
     }
     return values
-  }, [selectedDate, wakeTime])
+  }, [slotStart])
 
   useEffect(() => {
     try {
@@ -158,6 +155,28 @@ export function DailyPlanningScratchpad({
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify(blocks))
   }, [blocks, storageKey])
+
+  useEffect(() => {
+    const updateCurrentTime = () => {
+      const now = new Date()
+      if (!isSameCalendarDay(selectedDate, now)) {
+        setCurrentTimeMinutes(null)
+        return
+      }
+
+      const minutes = (now.getHours() * 60) + now.getMinutes()
+      if (minutes < slotStart || minutes > END_HOUR * 60) {
+        setCurrentTimeMinutes(null)
+        return
+      }
+
+      setCurrentTimeMinutes(minutes)
+    }
+
+    updateCurrentTime()
+    const interval = window.setInterval(updateCurrentTime, 60000)
+    return () => window.clearInterval(interval)
+  }, [selectedDate, slotStart])
 
   useEffect(() => {
     if (!resizingBlockId) return
@@ -203,6 +222,9 @@ export function DailyPlanningScratchpad({
   }, [blocks])
 
   const filledCount = blocks.filter((block) => block.text.trim().length > 0).length
+  const currentTimeOffset = currentTimeMinutes === null
+    ? null
+    : ((currentTimeMinutes - slotStart) / SLOT_MINUTES) * SLOT_HEIGHT
 
   const handleCreateBlock = (slotMinutes: number) => {
     const existingBlock = blocks.find((block) => slotMinutes >= block.start && slotMinutes < block.end)
@@ -229,8 +251,8 @@ export function DailyPlanningScratchpad({
         </h2>
       </div>
 
-      <div className="rounded-[1.7rem] border border-[#d8d2c3] bg-[linear-gradient(180deg,rgba(255,253,248,0.98),rgba(248,244,235,0.94))] shadow-[0_18px_60px_rgba(120,98,63,0.08)] overflow-hidden">
-        <div className="px-3.5 py-3.5 md:px-4 md:py-3.5">
+      <div className="bg-[linear-gradient(180deg,rgba(255,253,248,0.92),rgba(248,244,235,0.72))]">
+        <div className="px-1 py-1">
           <div className="mb-2.5 flex items-start justify-between gap-4">
             <div>
               <p className="text-lg font-heading text-[#3f3a31] tracking-tight">
@@ -240,15 +262,26 @@ export function DailyPlanningScratchpad({
                 Pull a block downward to claim more time.
               </p>
             </div>
-            <div className="rounded-full border border-[#ddd4c4] bg-white/70 px-2.5 py-0.5 text-xs text-[#7a7163]">
+            <div className="rounded-full border border-[#ddd4c4] bg-white/55 px-2.5 py-0.5 text-xs text-[#7a7163]">
               {filledCount} planned
             </div>
           </div>
 
           <div
             ref={resizeAreaRef}
-            className="rounded-[1.2rem] border border-[#e1dacb] bg-[linear-gradient(180deg,rgba(255,255,255,0.24),rgba(255,255,255,0.12))] px-2 py-2.5"
+            className="relative bg-transparent"
           >
+            {currentTimeOffset !== null && (
+              <div
+                className="pointer-events-none absolute inset-x-[4.75rem] z-20"
+                style={{ top: `${currentTimeOffset}px` }}
+              >
+                <div className="relative">
+                  <div className="absolute -left-2.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-[#d28b6d] shadow-[0_0_0_3px_rgba(255,253,248,0.9)]" />
+                  <div className="h-px bg-gradient-to-r from-[#d28b6d]/90 via-[#d28b6d]/45 to-transparent" />
+                </div>
+              </div>
+            )}
             <div className="space-y-0">
               {slots.map((slotMinutes) => {
                 if (coveredSlots.has(slotMinutes)) return null
@@ -278,7 +311,7 @@ export function DailyPlanningScratchpad({
 
                     {block ? (
                       <div
-                        className="relative rounded-[1rem] border border-[#dccfb8] bg-white/70 px-2.5 py-2 shadow-[0_6px_16px_rgba(120,98,63,0.05)]"
+                        className="relative rounded-[1rem] bg-white/48 px-2.5 py-2 shadow-[0_4px_14px_rgba(120,98,63,0.04)] backdrop-blur-[1px]"
                         style={{ minHeight: `${Math.max(SLOT_HEIGHT * ((block.end - block.start) / SLOT_MINUTES), SLOT_HEIGHT)}px` }}
                       >
                         <div className="pointer-events-none absolute left-0 top-2 bottom-2 w-px bg-[#e3d9c9]" />
@@ -329,11 +362,11 @@ export function DailyPlanningScratchpad({
                     ) : (
                       <button
                         onClick={() => handleCreateBlock(slotMinutes)}
-                        className="relative rounded-[0.95rem] border border-transparent bg-white/25 px-2 py-0 text-left transition-colors hover:bg-white/45"
+                        className="relative rounded-[0.85rem] border border-transparent bg-transparent px-2 py-0 text-left transition-colors hover:bg-white/20"
                         style={{ minHeight: `${SLOT_HEIGHT}px` }}
                       >
-                        <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-[#e8dfcf]" />
-                        <div className="pointer-events-none absolute left-0 top-[6px] bottom-[6px] w-px bg-[#e3d9c9]" />
+                        <div className="pointer-events-none absolute inset-x-2 top-1/2 h-px -translate-y-1/2 bg-[#ebe2d4]/42" />
+                        <div className="pointer-events-none absolute left-0 top-[7px] bottom-[7px] w-px bg-[#e3d9c9]/70" />
 
                         {pinnedEvents.length > 0 && (
                           <div className="relative z-10 flex h-full flex-wrap items-center gap-1.5 pl-3">
