@@ -3167,7 +3167,7 @@ export default function TodayPage() {
                 {/* Monthly Spending Chart */}
                 {monthlyTotals.some(m => m.total > 0) && (() => {
                   const chartData = monthlyTotals.map((m, i) => ({
-                    month: new Date(m.month + '-01').toLocaleDateString('en-US', { month: 'short' }),
+                    month: new Date(m.month + '-01T12:00:00').toLocaleDateString('en-US', { month: 'short' }),
                     total: m.total,
                     isCurrent: i === monthlyTotals.length - 1,
                   }))
@@ -3216,7 +3216,7 @@ export default function TodayPage() {
                                 ${current.total.toFixed(2)}
                               </span>
                               <span className="text-xs text-gray-500 dark:text-slate-400 ml-1.5">
-                                {new Date(current.month + '-01').toLocaleDateString('en-US', { month: 'long' })}
+                                {new Date(current.month + '-01T12:00:00').toLocaleDateString('en-US', { month: 'long' })}
                               </span>
                             </div>
                             <div className={`flex items-center gap-1 text-sm font-semibold ${delta > 0 ? 'text-red-500' : 'text-green-500'}`}>
@@ -3228,7 +3228,7 @@ export default function TodayPage() {
                             </div>
                           </div>
                           <p className="text-xs text-gray-400 dark:text-slate-500">
-                            vs {new Date(previous.month + '-01').toLocaleDateString('en-US', { month: 'long' })} — ${previous.total.toFixed(2)}
+                            vs {new Date(previous.month + '-01T12:00:00').toLocaleDateString('en-US', { month: 'long' })} — ${previous.total.toFixed(2)}
                           </p>
                         </div>
                       )}
