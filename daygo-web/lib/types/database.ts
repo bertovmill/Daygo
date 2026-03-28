@@ -552,6 +552,7 @@ export interface Database {
           user_id: string;
           date: string;
           note: string;
+          big_wins: string[];
           created_at: string;
           updated_at: string;
         };
@@ -560,6 +561,7 @@ export interface Database {
           user_id: string;
           date: string;
           note?: string;
+          big_wins?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -568,6 +570,7 @@ export interface Database {
           user_id?: string;
           date?: string;
           note?: string;
+          big_wins?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -1242,4 +1245,3 @@ export type TodayItem =
   | { type: 'todo'; data: Todo }
   | { type: 'vision'; data: Vision }
   | { type: 'identity'; data: Identity };
-
