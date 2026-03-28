@@ -1,28 +1,24 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, Clock3, Sparkles } from 'lucide-react'
 import type { ScheduleEvent } from '@/lib/types/database'
 import type { GoogleCalendarDisplayEvent } from '@/components/ScheduleGrid'
+import { scratchpadBlocksService, type ScratchpadBlock } from '@/lib/services/scratchpadBlocks'
 
 interface DailyPlanningScratchpadProps {
   selectedDate: Date
   scheduleEvents: ScheduleEvent[]
   googleCalendarEvents?: GoogleCalendarDisplayEvent[]
   wakeTime?: string
-}
-
-interface ScratchpadBlock {
-  id: string
-  start: number
-  end: number
-  text: string
+  userId?: string
 }
 
 const END_HOUR = 22
 const DEFAULT_START_HOUR = 6
 const SLOT_MINUTES = 30
 const SLOT_HEIGHT = 30
+const SAVE_DEBOUNCE_MS = 1000
 
 function formatDateKey(date: Date) {
   return date.toISOString().split('T')[0]
@@ -39,14 +35,6 @@ function formatSlotLabel(totalMinutes: number) {
   const period = hours >= 12 ? 'PM' : 'AM'
   const displayHour = hours % 12 || 12
   return `${displayHour}:${String(minutes).padStart(2, '0')} ${period}`
-}
-
-function roundUpToNextHalfHour(date: Date) {
-  const hours = date.getHours()
-  const minutes = date.getMinutes()
-  const roundedMinutes = minutes === 0 ? 0 : minutes <= 30 ? 30 : 60
-  if (roundedMinutes === 60) return (hours + 1) * 60
-  return (hours * 60) + roundedMinutes
 }
 
 function isSameCalendarDay(left: Date, right: Date) {
@@ -125,13 +113,15 @@ export function DailyPlanningScratchpad({
   scheduleEvents,
   googleCalendarEvents = [],
   wakeTime,
+  userId,
 }: DailyPlanningScratchpadProps) {
   const dateKey = formatDateKey(selectedDate)
-  const storageKey = `daygo-scratchpad-blocks-${dateKey}`
   const [blocks, setBlocks] = useState<ScratchpadBlock[]>([])
   const [resizingBlockId, setResizingBlockId] = useState<string | null>(null)
   const [currentTimeMinutes, setCurrentTimeMinutes] = useState<number | null>(null)
   const resizeAreaRef = useRef<HTMLDivElement | null>(null)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hasLoadedRef = useRef(false)
   const slotStart = useMemo(() => getSlotStart(selectedDate, wakeTime), [selectedDate, wakeTime])
 
   const slots = useMemo(() => {
@@ -143,18 +133,89 @@ export function DailyPlanningScratchpad({
     return values
   }, [slotStart])
 
+  // Load blocks from database (or localStorage fallback)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey)
-      setBlocks(saved ? sortBlocks(JSON.parse(saved) as ScratchpadBlock[]) : [])
-    } catch {
-      setBlocks([])
+    hasLoadedRef.current = false
+    let cancelled = false
+
+    async function load() {
+      if (userId) {
+        try {
+          const dbBlocks = await scratchpadBlocksService.getBlocks(userId, dateKey)
+          if (!cancelled) {
+            setBlocks(dbBlocks.length > 0 ? sortBlocks(dbBlocks) : [])
+            hasLoadedRef.current = true
+
+            // Migrate localStorage data if DB is empty but localStorage has data
+            const storageKey = `daygo-scratchpad-blocks-${dateKey}`
+            if (dbBlocks.length === 0) {
+              try {
+                const saved = localStorage.getItem(storageKey)
+                if (saved) {
+                  const localBlocks = JSON.parse(saved) as ScratchpadBlock[]
+                  if (localBlocks.length > 0) {
+                    setBlocks(sortBlocks(localBlocks))
+                    await scratchpadBlocksService.saveBlocks(userId, dateKey, localBlocks)
+                    localStorage.removeItem(storageKey)
+                  }
+                }
+              } catch { /* ignore localStorage errors */ }
+            } else {
+              // DB has data, clean up localStorage
+              try { localStorage.removeItem(`daygo-scratchpad-blocks-${dateKey}`) } catch { /* ignore */ }
+            }
+          }
+          return
+        } catch {
+          // Fall through to localStorage
+        }
+      }
+
+      // Fallback: localStorage only (no user logged in or DB error)
+      if (!cancelled) {
+        try {
+          const saved = localStorage.getItem(`daygo-scratchpad-blocks-${dateKey}`)
+          setBlocks(saved ? sortBlocks(JSON.parse(saved) as ScratchpadBlock[]) : [])
+        } catch {
+          setBlocks([])
+        }
+        hasLoadedRef.current = true
+      }
     }
-  }, [storageKey])
+
+    load()
+    return () => { cancelled = true }
+  }, [userId, dateKey])
+
+  // Debounced save to database whenever blocks change
+  const saveToDb = useCallback((blocksToSave: ScratchpadBlock[]) => {
+    if (!userId || !hasLoadedRef.current) return
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      scratchpadBlocksService.saveBlocks(userId, dateKey, blocksToSave).catch(() => {
+        // Fallback: save to localStorage if DB save fails
+        try {
+          localStorage.setItem(`daygo-scratchpad-blocks-${dateKey}`, JSON.stringify(blocksToSave))
+        } catch { /* ignore */ }
+      })
+    }, SAVE_DEBOUNCE_MS)
+  }, [userId, dateKey])
 
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(blocks))
-  }, [blocks, storageKey])
+    if (!hasLoadedRef.current) return
+    saveToDb(blocks)
+    // Also keep localStorage as a backup
+    try {
+      localStorage.setItem(`daygo-scratchpad-blocks-${dateKey}`, JSON.stringify(blocks))
+    } catch { /* ignore */ }
+  }, [blocks, saveToDb, dateKey])
+
+  // Cleanup save timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     const updateCurrentTime = () => {
@@ -243,7 +304,7 @@ export function DailyPlanningScratchpad({
   }
 
   return (
-    <section className="mb-10">
+    <section id="section-scratch-pad" className="mb-10">
       <div className="mb-3 flex items-center gap-2">
         <BookOpen className="w-4 h-4 text-slate-400" />
         <h2 className="text-xs font-medium uppercase tracking-[0.12em] text-slate-400">
