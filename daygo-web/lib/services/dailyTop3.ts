@@ -9,9 +9,15 @@ const client = createClient(supabaseUrl, supabaseAnonKey, {
 
 export interface DailyTop3Item {
   text: string
+  completed?: boolean
+  exitCriteria?: string
 }
 
-const DEFAULT_ITEMS: DailyTop3Item[] = [{ text: '' }, { text: '' }, { text: '' }]
+const DEFAULT_ITEMS: DailyTop3Item[] = [
+  { text: '', completed: false, exitCriteria: '' },
+  { text: '', completed: false, exitCriteria: '' },
+  { text: '', completed: false, exitCriteria: '' },
+]
 
 export const dailyTop3Service = {
   async getItems(userId: string, date: string): Promise<DailyTop3Item[]> {

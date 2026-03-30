@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ListOrdered } from 'lucide-react'
+import { ListOrdered, CheckCircle2, Circle } from 'lucide-react'
 import { dailyTop3Service, type DailyTop3Item } from '@/lib/services/dailyTop3'
 
 interface DailyTop3Props {
@@ -10,7 +10,11 @@ interface DailyTop3Props {
 }
 
 const SAVE_DEBOUNCE_MS = 1000
-const DEFAULT_ITEMS: DailyTop3Item[] = [{ text: '' }, { text: '' }, { text: '' }]
+const DEFAULT_ITEMS: DailyTop3Item[] = [
+  { text: '', completed: false, exitCriteria: '' },
+  { text: '', completed: false, exitCriteria: '' },
+  { text: '', completed: false, exitCriteria: '' },
+]
 const PLACEHOLDERS = ['Priority 1...', 'Priority 2...', 'Priority 3...']
 
 function formatDateKey(date: Date) {
@@ -74,7 +78,15 @@ export function DailyTop3({ userId, selectedDate }: DailyTop3Props) {
   }, [])
 
   const handleChange = (index: number, text: string) => {
-    setItems((current) => current.map((item, i) => i === index ? { text } : item))
+    setItems((current) => current.map((item, i) => i === index ? { ...item, text } : item))
+  }
+
+  const handleToggleComplete = (index: number) => {
+    setItems((current) => current.map((item, i) => i === index ? { ...item, completed: !item.completed } : item))
+  }
+
+  const handleExitCriteriaChange = (index: number, exitCriteria: string) => {
+    setItems((current) => current.map((item, i) => i === index ? { ...item, exitCriteria } : item))
   }
 
   const filledCount = items.filter((item) => item.text.trim().length > 0).length
@@ -95,17 +107,38 @@ export function DailyTop3({ userId, selectedDate }: DailyTop3Props) {
 
       <div className="rounded-2xl bg-[linear-gradient(180deg,rgba(255,253,248,0.92),rgba(248,244,235,0.72))] px-4 py-3 space-y-1">
         {items.map((item, index) => (
-          <div key={index} className="flex items-center gap-3 py-1.5">
-            <span className="text-xl font-heading font-semibold text-[#c4b8a3] select-none w-6 text-center shrink-0">
-              {index + 1}
-            </span>
-            <input
-              type="text"
-              value={item.text}
-              onChange={(e) => handleChange(index, e.target.value)}
-              placeholder={PLACEHOLDERS[index]}
-              className="flex-1 bg-transparent border-b border-[#e3d9c9]/60 focus:border-[#c4b8a3] text-[15px] text-[#41382c] placeholder:text-[#c4b8a3]/60 py-1.5 outline-none transition-colors"
-            />
+          <div key={index} className="py-1.5">
+            <div className="flex items-center gap-3">
+              <span className="text-xl font-heading font-semibold text-[#c4b8a3] select-none w-6 text-center shrink-0">
+                {index + 1}
+              </span>
+              <input
+                type="text"
+                value={item.text}
+                onChange={(e) => handleChange(index, e.target.value)}
+                placeholder={PLACEHOLDERS[index]}
+                className={`flex-1 bg-transparent border-b border-[#e3d9c9]/60 focus:border-[#c4b8a3] text-[15px] placeholder:text-[#c4b8a3]/60 py-1.5 outline-none transition-colors ${item.completed ? 'line-through text-[#c4b8a3]' : 'text-[#41382c]'}`}
+              />
+              <button
+                onClick={() => handleToggleComplete(index)}
+                className="shrink-0 transition-colors"
+                aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
+              >
+                {item.completed
+                  ? <CheckCircle2 className="w-5 h-5 text-[#c4b8a3]" />
+                  : <Circle className="w-5 h-5 text-[#e3d9c9]" />
+                }
+              </button>
+            </div>
+            <div className="ml-9 mt-1">
+              <input
+                type="text"
+                value={item.exitCriteria ?? ''}
+                onChange={(e) => handleExitCriteriaChange(index, e.target.value)}
+                placeholder="Exit criteria..."
+                className="w-full bg-transparent border-b border-[#e3d9c9]/40 focus:border-[#c4b8a3]/60 text-[12px] text-[#8a7d6b] placeholder:text-[#c4b8a3]/50 py-1 outline-none transition-colors"
+              />
+            </div>
           </div>
         ))}
       </div>
