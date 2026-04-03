@@ -1204,6 +1204,32 @@ export interface Database {
           updated_at?: string;
         };
       };
+      dreamboard_images: {
+        Row: {
+          id: string;
+          user_id: string;
+          image_url: string;
+          caption: string | null;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          image_url: string;
+          caption?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          image_url?: string;
+          caption?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+      };
     };
     Views: {
       daily_scores: {
@@ -1255,6 +1281,7 @@ export type ExpenseCategory = Expense['category'];
 export type GiftIdea = Database['public']['Tables']['gift_ideas']['Row'];
 export type PushupLog = Database['public']['Tables']['pushup_logs']['Row'];
 export type DailyReflection = Database['public']['Tables']['daily_reflections']['Row'];
+export type DreamboardImage = Database['public']['Tables']['dreamboard_images']['Row'];
 export type BenchmarkWorkout = Database['public']['Tables']['benchmark_workouts']['Row'];
 export type BenchmarkSegment = Database['public']['Tables']['benchmark_segments']['Row'];
 

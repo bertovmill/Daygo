@@ -106,6 +106,7 @@ import { ScoreRing } from '@/components/ScoreRing'
 import { RichTextEditor } from '@/components/RichTextEditor'
 import { PepTalkAudioPlayer } from '@/components/PepTalkAudioPlayer'
 import { MealPlanCard } from '@/components/MealPlanCard'
+import { DreamboardSection } from '@/components/DreamboardSection'
 import type { HabitWithLog, Mantra, Todo, Vision, Identity, JournalPromptWithEntry, ScheduleEvent, CalendarRule, Goal, ScheduleTemplate, AIJournal, Book, Value, Expense, ExpenseCategory } from '@/lib/types/database'
 import { calculateMissionScore } from '@/lib/services/missionScore'
 import confetti from 'canvas-confetti'
@@ -297,6 +298,7 @@ const [newExpenseAmount, setNewExpenseAmount] = useState('')
       aiJournals: true,
       books: true,
       expenses: true,
+      dreamboard: true,
     }
   })
 
@@ -3323,6 +3325,13 @@ const [newExpenseAmount, setNewExpenseAmount] = useState('')
               </>
             )}
           </section>
+
+          {/* Dreamboard */}
+          <DreamboardSection
+            userId={user!.id}
+            expanded={expandedSections.dreamboard}
+            onToggle={() => toggleSection('dreamboard')}
+          />
 
           {/* To-Dos */}
           {todos.length > 0 && (
